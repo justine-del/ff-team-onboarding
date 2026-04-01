@@ -5,16 +5,16 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
 const SOPS = [
-  { id: 1, priority: 'CRITICAL', name: 'Funnel Futurist Overview', link: 'Master SOP Documentation', est_minutes: 45 },
-  { id: 2, priority: 'CRITICAL', name: 'Daily Sheet Tracking Update', link: 'Master SOP Documentation', est_minutes: 30 },
-  { id: 3, priority: 'CRITICAL', name: 'Weekly Reporting', link: 'Master SOP Documentation', est_minutes: 30 },
-  { id: 4, priority: 'CRITICAL', name: 'Accountability', link: 'Master SOP Documentation', est_minutes: 20 },
-  { id: 5, priority: 'CRITICAL', name: 'Data Privacy & Security', link: 'Master SOP Documentation', est_minutes: 10 },
-  { id: 6, priority: 'CRITICAL', name: 'LastPass Complete Guide', link: 'Master SOP Documentation', est_minutes: 20 },
-  { id: 7, priority: 'HIGH', name: 'Communication Policy - Slack', link: 'Master SOP Documentation', est_minutes: 30 },
-  { id: 8, priority: 'HIGH', name: 'Time Off Policy', link: 'Master SOP Documentation', est_minutes: 15 },
-  { id: 9, priority: 'HIGH', name: 'Invoice Policy', link: 'Master SOP Documentation', est_minutes: 10 },
-  { id: 10, priority: 'HIGH', name: 'ClickUp Training', link: 'Master SOP Documentation', est_minutes: 20 },
+  { id: 1,  priority: 'CRITICAL', name: 'Funnel Futurist Overview',        est_minutes: 45, doc_link: 'https://docs.google.com/document/d/1-w9XLBzLirHQuicHnScLaAhVEHhV21PyRRVR8mLy0zo/edit?pli=1&tab=t.gtqrj7ku20p4' },
+  { id: 2,  priority: 'CRITICAL', name: 'Daily Sheet Tracking Update',     est_minutes: 30, doc_link: 'https://docs.google.com/document/d/14mB6RywUjrdX0ZsNSLMIKD16eDFv6i_nLlhrZ-138z0/edit?tab=t.ncr9g63k9qqu#heading=h.yisnceh2al87' },
+  { id: 3,  priority: 'CRITICAL', name: 'Weekly Reporting',                est_minutes: 30, doc_link: 'https://docs.google.com/document/d/14mB6RywUjrdX0ZsNSLMIKD16eDFv6i_nLlhrZ-138z0/edit?tab=t.gwffa3gfippg' },
+  { id: 4,  priority: 'CRITICAL', name: 'Accountability',                  est_minutes: 20, doc_link: 'https://docs.google.com/document/d/14mB6RywUjrdX0ZsNSLMIKD16eDFv6i_nLlhrZ-138z0/edit?tab=t.vf3ywukchg7k#heading=h.oj7uvula8pw9' },
+  { id: 5,  priority: 'CRITICAL', name: 'Data Privacy & Security',         est_minutes: 10, doc_link: 'https://docs.google.com/document/d/14mB6RywUjrdX0ZsNSLMIKD16eDFv6i_nLlhrZ-138z0/edit?tab=t.l48nut1f9s1v#heading=h.1839bfphqn1f' },
+  { id: 6,  priority: 'CRITICAL', name: 'LastPass Complete Guide',         est_minutes: 20, doc_link: 'https://docs.google.com/document/d/14mB6RywUjrdX0ZsNSLMIKD16eDFv6i_nLlhrZ-138z0/edit?tab=t.l48nut1f9s1v#heading=h.cq5dxg6tgbo9' },
+  { id: 7,  priority: 'HIGH',     name: 'Communication Policy - Slack',    est_minutes: 30, doc_link: 'https://docs.google.com/document/d/14mB6RywUjrdX0ZsNSLMIKD16eDFv6i_nLlhrZ-138z0/edit?tab=t.vo7m77jnvd96' },
+  { id: 8,  priority: 'HIGH',     name: 'Time Off Policy',                 est_minutes: 15, doc_link: 'https://docs.google.com/document/d/14mB6RywUjrdX0ZsNSLMIKD16eDFv6i_nLlhrZ-138z0/edit?tab=t.vo7m77jnvd96#heading=h.1aab3yccu4dr' },
+  { id: 9,  priority: 'HIGH',     name: 'Invoice Policy',                  est_minutes: 10, doc_link: 'https://docs.google.com/document/d/14mB6RywUjrdX0ZsNSLMIKD16eDFv6i_nLlhrZ-138z0/edit?tab=t.deqnt61hseb7#heading=h.91k1s8vt8v7h' },
+  { id: 10, priority: 'HIGH',     name: 'ClickUp Training',                est_minutes: 20, doc_link: 'https://docs.google.com/document/d/14mB6RywUjrdX0ZsNSLMIKD16eDFv6i_nLlhrZ-138z0/edit?tab=t.8yg4y9ikur76#heading=h.r006pmpy0wwk' },
 ]
 
 export default function SOPsPage() {
@@ -105,10 +105,15 @@ export default function SOPsPage() {
                     </button>
                     <div className="flex-1">
                       <p className="font-medium text-sm">{sop.name}</p>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs text-gray-500">
-                          {sop.link === 'Master SOP Documentation' ? 'Link to be added by admin' : sop.link}
-                        </span>
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <a
+                          href={sop.doc_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-purple-400 hover:text-purple-300"
+                        >
+                          View SOP →
+                        </a>
                         <span className="text-xs text-gray-500">~{sop.est_minutes} mins</span>
                       </div>
                     </div>

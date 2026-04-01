@@ -4,27 +4,29 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
+const BASE = 'https://docs.google.com/document/d/1ipxjN1qkppZCttHQ8JNJqhy5EJafdN830INj01BosK4/edit'
+
 const LESSONS = [
   // Orientation - Video
-  { id: 1, category: 'Orientation - Video', name: 'START HERE', description: 'Watch this first — overview of the Cyborg VA program and what to expect', loom_link: '#', benchmark_mins: 10 },
-  { id: 2, category: 'Orientation - Video', name: 'The Cyborg VA Roles', description: 'Understand the different VA roles and responsibilities within the team', loom_link: '#', benchmark_mins: 15 },
-  { id: 3, category: 'Orientation - Video', name: 'Claude brain / GPT brain', description: 'How to use Claude and ChatGPT as your AI thinking partners', loom_link: '#', benchmark_mins: 20 },
-  { id: 4, category: 'Orientation - Video', name: 'Business Fundamentals', description: 'Core business concepts you need to understand to succeed in this role', loom_link: '#', benchmark_mins: 25 },
-  { id: 5, category: 'Orientation - Video', name: 'Customer Journey', description: 'Map the client experience from lead to loyal customer', loom_link: '#', benchmark_mins: 20 },
-  { id: 6, category: 'Orientation - Video', name: 'Elite values & Mindset', description: 'The mindset and values that define elite performance at Funnel Futurist', loom_link: '#', benchmark_mins: 15 },
+  { id: 1,  category: 'Orientation - Video', name: 'START HERE',                              description: 'Discover the two types of VAs and how to become an elite Cyborg VA',                                     doc_link: `${BASE}?tab=t.0#heading=h.vaae8ia5t4k0`,                      loom_link: null,                                                                benchmark_mins: 4  },
+  { id: 2,  category: 'Orientation - Video', name: 'The Cyborg VA Roles',                     description: 'Learn to function as a founder\'s operational right hand across different VA roles',                    doc_link: `${BASE}?tab=t.ha46dxvgs0z8`,                                  loom_link: null,                                                                benchmark_mins: 6  },
+  { id: 3,  category: 'Orientation - Video', name: 'Claude brain / GPT brain',                description: 'Understand your client\'s AI-powered assistant systems for maximum productivity',                       doc_link: `${BASE}?tab=t.9ct01zs2q8f`,                                   loom_link: null,                                                                benchmark_mins: 20 },
+  { id: 4,  category: 'Orientation - Video', name: 'Business Fundamentals',                   description: 'Understand the three core pillars of any business and how every role contributes',                      doc_link: `${BASE}?tab=t.96rhlqmc6lh8`,                                  loom_link: null,                                                                benchmark_mins: 10 },
+  { id: 5,  category: 'Orientation - Video', name: 'Customer Journey',                        description: 'Masterclass on the customer transformation framework that represents the entire business strategy',      doc_link: `${BASE}?tab=t.rn4nb3a00vp8`,                                  loom_link: null,                                                                benchmark_mins: 10 },
+  { id: 6,  category: 'Orientation - Video', name: 'Elite values & Mindset',                  description: 'The three core Cyborg VA values that shape everything you do and make you stand out',                  doc_link: `${BASE}?tab=t.b1vk02hgxdv1`,                                  loom_link: null,                                                                benchmark_mins: 30 },
   // Ramp - Video
-  { id: 7, category: 'Ramp - Video', name: 'Core Skills', description: 'Essential skills every Cyborg VA must master', loom_link: '#', benchmark_mins: 30 },
-  { id: 8, category: 'Ramp - Video', name: 'Core Tools', description: "Deep dive into the tools you'll use every day", loom_link: '#', benchmark_mins: 30 },
-  { id: 9, category: 'Ramp - Video', name: '3D Framework', description: 'The 3D Framework for delivering exceptional work', loom_link: '#', benchmark_mins: 20 },
-  { id: 10, category: 'Ramp - Video', name: '2-min Intro Loom', description: 'Create your introduction Loom video for the team', loom_link: '#', benchmark_mins: 10 },
-  { id: 11, category: 'Ramp - Video', name: 'Daily/Weekly SOP', description: 'Learn your daily and weekly standard operating procedures', loom_link: '#', benchmark_mins: 20 },
-  { id: 12, category: 'Ramp - Video', name: 'AI Essentials - Mastery', description: 'Master the AI tools that power your work as a Cyborg VA', loom_link: '#', benchmark_mins: 45 },
-  { id: 13, category: 'Ramp - Video', name: 'Gemini for Document Creation', description: 'Use Gemini AI to create professional documents faster', loom_link: '#', benchmark_mins: 30 },
-  { id: 14, category: 'Ramp - Video', name: 'The Omnipresent Organic Authority System', description: 'Build and manage omnipresent organic content systems', loom_link: '#', benchmark_mins: 45 },
-  { id: 15, category: 'Ramp - Video', name: 'Complete Go Highlevel Guide', description: 'Full training on Go HighLevel CRM and marketing automation', loom_link: '#', benchmark_mins: 60 },
-  { id: 16, category: 'Ramp - Video', name: 'Omnipresent Authority Ads Training', description: 'Learn to run and manage authority-building ad campaigns', loom_link: '#', benchmark_mins: 45 },
+  { id: 7,  category: 'Ramp - Video',        name: 'Core Skills',                             description: 'Master essential VA skills to excel in competitive situations',                                          doc_link: `${BASE}?tab=t.aolgg0h2jdw2`,                                  loom_link: null,                                                                benchmark_mins: 10 },
+  { id: 8,  category: 'Ramp - Video',        name: 'Core Tools',                              description: 'Get trained on all essential tools that Cyborg VAs use for maximum productivity',                       doc_link: `${BASE}?tab=t.yn4yejxkms6n`,                                  loom_link: null,                                                                benchmark_mins: 20 },
+  { id: 9,  category: 'Ramp - Video',        name: '3D Framework',                            description: 'Command center document to level up fast, stay aligned, and turn tasks into systems',                  doc_link: `${BASE}?tab=t.djgqv1e9z8nh`,                                  loom_link: null,                                                                benchmark_mins: 20 },
+  { id: 10, category: 'Ramp - Video',        name: '2-min Intro Loom',                        description: 'Create an engaging 2-minute introduction video showcasing your value as a Cyborg VA',                  doc_link: `${BASE}?tab=t.xv3o6in48tlj`,                                  loom_link: null,                                                                benchmark_mins: 10 },
+  { id: 11, category: 'Ramp - Video',        name: 'Daily/Weekly SOP',                        description: 'Learn the protocol for creating SOPs that document your workflows and processes',                       doc_link: `${BASE}?tab=t.1aaxnscwwzc7`,                                  loom_link: null,                                                                benchmark_mins: 20 },
+  { id: 12, category: 'Ramp - Video',        name: 'AI Essentials - Mastery',                 description: 'Distilled wisdom from 3+ years of AI implementation to master AI tools in real business',             doc_link: `${BASE}?tab=t.wz7bx2jerije#heading=h.trfrgx7vpyp5`,          loom_link: null,                                                                benchmark_mins: 30 },
+  { id: 13, category: 'Ramp - Video',        name: 'Gemini for Document Creation',            description: 'Use Google Gemini instead of Claude to create, edit, and export well-formatted Google Docs',           doc_link: `${BASE}?tab=t.j42odyozdaw6`,                                  loom_link: 'https://youtu.be/v9CZ8vFQ_bo',                                     benchmark_mins: 30 },
+  { id: 14, category: 'Ramp - Video',        name: 'The Omnipresent Organic Authority System',description: 'Learn the 5-step Omnipresent Authority Funnel strategy for organic attention and content distribution', doc_link: `${BASE}?tab=t.hzamsm4x2v9g#heading=h.kxb3w18tsxtf`,          loom_link: 'https://youtu.be/8JD6BkoFQdU',                                     benchmark_mins: 45 },
+  { id: 15, category: 'Ramp - Video',        name: 'Complete Go Highlevel Guide',             description: 'Comprehensive training on managing CRM systems and sales operations in HighLevel',                      doc_link: `${BASE}?tab=t.m1zhfslk00di`,                                  loom_link: 'https://www.loom.com/share/2c53daff890148ef973cc29e6ae19350',      benchmark_mins: 60 },
+  { id: 16, category: 'Ramp - Video',        name: 'Omnipresent Authority Ads Training',      description: 'Learn the paid advertising strategy and campaign launch process for maximum reach and conversions',     doc_link: `${BASE}?tab=t.k23m2sw1bvjs#heading=h.xurx1ggqgh3f`,          loom_link: 'https://youtu.be/AM9PIxlNPK8',                                     benchmark_mins: 55 },
   // Quiz
-  { id: 17, category: 'Quiz', name: 'ORIENTATION QUIZ', description: "Complete the orientation quiz to confirm you've absorbed the fundamentals", loom_link: '#', benchmark_mins: 15 },
+  { id: 17, category: 'Quiz',                name: 'ORIENTATION QUIZ',                        description: 'Complete this certification exam to demonstrate your understanding of core training modules',            doc_link: null,                                                          loom_link: 'https://k0tk16hntji.typeform.com/to/nCnNhiUH',                     benchmark_mins: 7  },
 ]
 
 const CATEGORIES = ['Orientation - Video', 'Ramp - Video', 'Quiz']
@@ -118,15 +120,15 @@ export default function Phase2Page() {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm">{lesson.name}</p>
                           <p className="text-xs text-gray-400 mt-0.5">{lesson.description}</p>
-                          <div className="flex items-center gap-3 mt-2">
-                            {lesson.loom_link !== '#' && (
-                              <a
-                                href={lesson.loom_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-blue-400 hover:text-blue-300"
-                              >
-                                Watch video →
+                          <div className="flex items-center gap-3 mt-2 flex-wrap">
+                            {lesson.doc_link && (
+                              <a href={lesson.doc_link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">
+                                View resource →
+                              </a>
+                            )}
+                            {lesson.loom_link && (
+                              <a href={lesson.loom_link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300">
+                                {lesson.id === 17 ? 'Take quiz →' : 'Watch video →'}
                               </a>
                             )}
                             <span className="text-xs text-gray-500">~{lesson.benchmark_mins} mins</span>

@@ -13,31 +13,33 @@ const SECURITY_NOTICES = [
 ]
 
 const FOUNDER_TASKS = [
-  { id: 1, name: 'Get Team Member Email', description: 'Collect and verify company email for new member', login_type: 'Admin setup' },
-  { id: 2, name: 'Add to Slack Workspace', description: 'Invite team member to the company Slack workspace', login_type: "Add Team Member's company email" },
-  { id: 3, name: 'VA Geekbot Access Set Up', description: 'Configure Geekbot standup access for the member', login_type: 'Geekbot admin setup' },
-  { id: 4, name: 'Add to All Slack Channels', description: 'Add member to all relevant Slack channels', login_type: 'Slack admin' },
-  { id: 5, name: 'Loom', description: 'Grant Loom workspace access', login_type: "Add Team Member's company email" },
-  { id: 6, name: 'Claude (Anthropic)', description: 'Set up Claude AI access for the member', login_type: "Add Team Member's company email" },
-  { id: 7, name: 'ChatGPT', description: 'Set up ChatGPT account access', login_type: "Add Team Member's company email" },
-  { id: 8, name: 'Notebook LM Brain', description: 'Share Notebook LM brain/project with member', login_type: 'Share via Google account' },
-  { id: 9, name: 'Google Drive Access', description: 'Grant access to company Google Drive folders', login_type: "Add Team Member's company email" },
-  { id: 10, name: 'Text Blaze / AI Blaze Access Setup', description: 'Set up Text Blaze snippet access', login_type: 'Team Member creates account' },
-  { id: 11, name: 'Fireflies.ai', description: 'Add team member to Fireflies workspace', login_type: "Add Team Member's company email" },
-  { id: 12, name: 'Create & Send Onboarding Sheet', description: 'Create personalized onboarding tracker and share with member', login_type: 'Google Sheets' },
-  { id: 13, name: 'Send Phase 1 Completion Message', description: 'Send confirmation message when Phase 1 setup is complete', login_type: 'Slack message' },
-  { id: 14, name: 'Miro Account Access', description: 'Add team member to Miro workspace', login_type: "Add Team Member's company email" },
-  { id: 15, name: 'Miro Template Library Access', description: 'Share Miro template library with member', login_type: 'Miro workspace' },
-  { id: 16, name: 'Outreach Platform Access', description: 'Set up access to outreach platform', login_type: 'Platform-specific setup' },
-  { id: 17, name: 'Outreach Templates & Scripts', description: 'Share outreach templates and scripts folder', login_type: 'Google Drive share' },
-  { id: 18, name: 'Target List / Lead Source', description: 'Provide access to target lists and lead sources', login_type: 'Google Sheets / CRM access' },
+  { id: 1,  name: 'Get Team Member Email',            description: 'Collect and verify company email for new member',                   login_type: 'Admin setup',                  doc_link: 'https://docs.google.com/document/d/1wG7u-4XwndawIFuB7MMyNkHMeP2l5LZKjk5lmGhzcew/edit?tab=t.n30b78xkijsr#heading=h.cvxucb1jfemh' },
+  { id: 2,  name: 'Add to Slack Workspace',           description: 'Invite team member to the company Slack workspace',                  login_type: "Add Team Member's company email", doc_link: 'https://docs.google.com/document/d/1wG7u-4XwndawIFuB7MMyNkHMeP2l5LZKjk5lmGhzcew/edit?tab=t.6ctgkupa0yoq#heading=h.qjntr1phu5r3' },
+  { id: 3,  name: 'VA Geekbot Access Set Up',         description: 'Configure Geekbot standup access for the member',                   login_type: 'Geekbot admin setup',          doc_link: 'https://docs.google.com/document/d/1wG7u-4XwndawIFuB7MMyNkHMeP2l5LZKjk5lmGhzcew/edit?tab=t.opbbwoo0we39' },
+  { id: 4,  name: 'Add to All Slack Channels',        description: 'Add member to all relevant Slack channels',                         login_type: 'Slack admin',                  doc_link: 'https://docs.google.com/document/d/1wG7u-4XwndawIFuB7MMyNkHMeP2l5LZKjk5lmGhzcew/edit?tab=t.k2gcv1tduarl' },
+  { id: 5,  name: 'Loom',                             description: 'Grant Loom workspace access',                                       login_type: "Add Team Member's company email", doc_link: 'https://docs.google.com/document/d/1wG7u-4XwndawIFuB7MMyNkHMeP2l5LZKjk5lmGhzcew/edit?tab=t.zgbynw4cta3z' },
+  { id: 6,  name: 'Claude (Anthropic)',               description: 'Set up Claude AI access for the member',                            login_type: "Add Team Member's company email", doc_link: 'https://docs.google.com/document/d/1wG7u-4XwndawIFuB7MMyNkHMeP2l5LZKjk5lmGhzcew/edit?tab=t.3cquobmyk4ma#heading=h.sxsljhuzei6a' },
+  { id: 7,  name: 'ChatGPT',                          description: 'Set up ChatGPT account access',                                     login_type: "Add Team Member's company email", doc_link: 'https://docs.google.com/document/d/1wG7u-4XwndawIFuB7MMyNkHMeP2l5LZKjk5lmGhzcew/edit?tab=t.ejq8uo9sgmen#heading=h.gsbww79izop7' },
+  { id: 8,  name: 'Notebook LM Brain',                description: 'Share Notebook LM brain/project with member',                      login_type: 'Share via Google account',     doc_link: 'https://docs.google.com/document/d/18N5ftr0w9x3w5bZ4ToRAdsfhvhAdZ0vVy8MtWBuu5hU/edit?tab=t.ic5bl665fgit#heading=h.ea7yote2xzmv' },
+  { id: 9,  name: 'Google Drive Access',              description: 'Grant access to company Google Drive folders',                      login_type: "Add Team Member's company email", doc_link: 'https://docs.google.com/document/d/1wG7u-4XwndawIFuB7MMyNkHMeP2l5LZKjk5lmGhzcew/edit?tab=t.1vdq29z1lmdu#heading=h.aahamopeb9lt' },
+  { id: 10, name: 'Text Blaze / AI Blaze Access Setup', description: 'Set up Text Blaze snippet access',                               login_type: 'Team Member creates account',  doc_link: 'https://docs.google.com/document/d/1wG7u-4XwndawIFuB7MMyNkHMeP2l5LZKjk5lmGhzcew/edit?tab=t.crj2sf8xfk3n#heading=h.d2g3cypwbai7' },
+  { id: 11, name: 'Fireflies.ai',                     description: 'Add team member to Fireflies workspace',                            login_type: "Add Team Member's company email", doc_link: 'https://docs.google.com/document/d/1wG7u-4XwndawIFuB7MMyNkHMeP2l5LZKjk5lmGhzcew/edit?tab=t.khh9rfhgnkze' },
+  { id: 12, name: 'Create & Send Onboarding Sheet',   description: 'Create personalized onboarding tracker and share with member',     login_type: 'Google Sheets',               doc_link: 'https://docs.google.com/document/d/18N5ftr0w9x3w5bZ4ToRAdsfhvhAdZ0vVy8MtWBuu5hU/edit?tab=t.2i9j0x7oka28' },
+  { id: 13, name: 'Send Phase 1 Completion Message',  description: 'Send confirmation message when Phase 1 setup is complete',         login_type: 'Slack message',               doc_link: 'https://docs.google.com/document/d/18N5ftr0w9x3w5bZ4ToRAdsfhvhAdZ0vVy8MtWBuu5hU/edit?tab=t.1irsfvkfem0f' },
+  { id: 14, name: 'Miro Account Access',              description: 'Add team member to Miro workspace',                                login_type: "Add Team Member's company email", doc_link: null },
+  { id: 15, name: 'Miro Template Library Access',     description: 'Share Miro template library with member',                          login_type: 'Miro workspace',              doc_link: 'https://miro.com/app/board/uXjVJj8jhss=/' },
+  { id: 16, name: 'Outreach Platform Access',         description: 'Set up access to outreach platform',                               login_type: 'Platform-specific setup',     doc_link: null },
+  { id: 17, name: 'Outreach Templates & Scripts',     description: 'Share outreach templates and scripts folder',                      login_type: 'Google Drive share',          doc_link: null },
+  { id: 18, name: 'Target List / Lead Source',        description: 'Provide access to target lists and lead sources',                  login_type: 'Google Sheets / CRM access',  doc_link: null },
 ]
 
 const MEMBER_TASKS = [
-  { id: 101, name: 'Watch intro video in Phase 2 section', description: 'Watch the START HERE orientation video before continuing' },
-  { id: 102, name: 'Check access to each tool listed above', description: 'Verify you can log in to all tools the Founder set up' },
-  { id: 103, name: 'Check company email for invitations', description: 'Check your company email inbox for any pending invitations' },
-  { id: 104, name: 'Accept all invitations and set up accounts', description: 'Accept every invitation and complete account setup with secure passwords' },
+  { id: 101, name: 'Intro Video / Expectations',              description: 'Watch the welcome video to understand your next steps',                doc_link: 'https://docs.google.com/document/d/1VDFbrsRWthk3XkN3Vn8zCtX3ZR9MA6au7Ov4jXvnp5Q/edit?tab=t.0' },
+  { id: 102, name: 'System Access — Category A & B',          description: 'Review tool categories, confirm access, and bookmark login pages',     doc_link: 'https://docs.google.com/document/d/1D9Sim0UE3P5FMkvqlGs9JyRkgv5TpM6Y8Xi5-pEdfeM/edit?tab=t.m4wmyannxwdd#heading=h.j1225gd0vh8m' },
+  { id: 103, name: 'Slack Workspace',                         description: 'Accept Slack invite and set up your profile',                          doc_link: 'https://docs.google.com/document/d/18N5ftr0w9x3w5bZ4ToRAdsfhvhAdZ0vVy8MtWBuu5hU/edit?tab=t.2lbndwppj2og' },
+  { id: 104, name: 'SuperWhisper',                            description: 'Sign up, download the app, and configure your hotkey',                 doc_link: 'https://docs.google.com/document/d/18N5ftr0w9x3w5bZ4ToRAdsfhvhAdZ0vVy8MtWBuu5hU/edit?tab=t.i7i4b5p7oleg' },
+  { id: 105, name: 'Google Drive',                            description: 'Accept the Google Drive invite and confirm folder access',             doc_link: 'https://docs.google.com/document/d/1fSEr9f_WGQnKeiBesDOBe1jiSjQg1cfcM9rLq6-F_Uw/edit?tab=t.1jfs3ed6vpyv' },
+  { id: 106, name: 'Send Final Phase 2 Completion Message',   description: 'Post your completion message in the ramp-up thread with time taken',  doc_link: 'https://docs.google.com/document/d/1wG7u-4XwndawIFuB7MMyNkHMeP2l5LZKjk5lmGhzcew/edit?tab=t.oml35f2gtczx#heading=h.k0lg2gbadewb' },
 ]
 
 export default function Phase1Page() {
@@ -150,7 +152,19 @@ export default function Phase1Page() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm">{task.name}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>
-                    <p className="text-xs text-blue-400/70 mt-0.5">Access type: {task.login_type}</p>
+                    <div className="flex items-center gap-3 mt-1.5">
+                      <p className="text-xs text-blue-400/70">Access type: {task.login_type}</p>
+                      {task.doc_link && (
+                        <a
+                          href={task.doc_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-purple-400 hover:text-purple-300"
+                        >
+                          View SOP →
+                        </a>
+                      )}
+                    </div>
                   </div>
                   <span className="text-xs text-gray-500 flex-shrink-0">Founder</span>
                 </div>
@@ -175,6 +189,16 @@ export default function Phase1Page() {
                   <div>
                     <p className="font-medium text-sm">{task.name}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>
+                    {task.doc_link && (
+                      <a
+                        href={task.doc_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-400 hover:text-purple-300 mt-1.5 inline-block"
+                      >
+                        View SOP →
+                      </a>
+                    )}
                   </div>
                 </div>
               )

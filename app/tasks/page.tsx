@@ -7,11 +7,11 @@ import Link from 'next/link'
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 const DEFAULT_TASKS = [
-  { id: 1, sop_number: '1', name: 'Understanding Your Core Sheet', description: 'Review and understand the updates in your core tracking sheet', days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '8 PM EST', est_time: '10 mins', is_eow: false },
-  { id: 2, sop_number: '2', name: 'Daily and Weekly SOP Creation', description: 'Create and update your daily and weekly standard operating procedures', days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '8 PM EST', est_time: '10 mins', is_eow: false },
-  { id: 3, sop_number: 'EOW-1', name: 'EOW SOP Solidification', description: 'Review and solidify all SOPs created during the week', days: ['Fri'], time_window: '5 PM EST', est_time: '1 hr', is_eow: true },
-  { id: 4, sop_number: 'EOW-2', name: 'EOW VA Clear Out and Restart', description: 'Clear your workspace and prepare for the new week', days: ['Fri'], time_window: '5 PM EST', est_time: '10 mins', is_eow: true },
-  { id: 5, sop_number: 'EOW-3', name: 'EOW FF Support Form Submission', description: 'Submit the Funnel Futurist end-of-week support form', days: ['Fri'], time_window: '5 PM EST', est_time: '10 mins', is_eow: true },
+  { id: 1, sop_number: '1',     name: 'Understanding Your Core Sheet',    description: 'Review and understand the updates in your core tracking sheet',            days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '8 PM EST', est_time: '10 mins', is_eow: false, loom_link: 'https://www.loom.com/share/6407bed964d14db8a26374c028bc4970',    doc_link: 'https://docs.google.com/document/d/1NpFOIAjPa_pKZ8o6L7qfyCj4XSpAwv_St1H1GfsCuSQ/edit?tab=t.0',                                                                                    form_link: null },
+  { id: 2, sop_number: '2',     name: 'Daily and Weekly SOP Creation',    description: 'Create and update your daily and weekly standard operating procedures',     days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '8 PM EST', est_time: '10 mins', is_eow: false, loom_link: 'https://www.loom.com/share/6ae36b6a3e074b5e8c525e2d79b88572',    doc_link: 'https://docs.google.com/document/d/10RIeXKvyUjhCyMcR2ERnsTyuntfhBkPSe6SW9fvuQMw/edit?tab=t.tkyxfcvf5q4m',                                                                          form_link: null },
+  { id: 3, sop_number: 'EOW-1', name: 'EOW SOP Solidification',           description: 'Review and solidify all SOPs created during the week',                      days: ['Fri'],                        time_window: '5 PM EST', est_time: '1 hr',    is_eow: true,  loom_link: 'https://www.loom.com/share/803db3b5261647dc8eab7b966992d33e',    doc_link: 'https://docs.google.com/document/d/1zM-mbToha4scwgM5f4RZOwRPNwzvsstrMYgI8o8tlP4/edit?tab=t.2tixycp0z60y#heading=h.i1sai7oqo0os',                                                   form_link: null },
+  { id: 4, sop_number: 'EOW-2', name: 'EOW VA Clear Out and Restart',     description: 'Clear your workspace and prepare for the new week',                         days: ['Fri'],                        time_window: '5 PM EST', est_time: '10 mins', is_eow: true,  loom_link: 'https://www.loom.com/share/0f1c078502d147038bd619e2b4e5bc4c',    doc_link: 'https://docs.google.com/document/d/1dgN71db7r0vbT3pvwyF_5fSs4f-VnmkWNwBvVv1IE7A/edit?tab=t.0#heading=h.el8shvjenf8a',                                                              form_link: null },
+  { id: 5, sop_number: 'EOW-3', name: 'EOW FF Support Form Submission',   description: 'Submit the Funnel Futurist end-of-week support form',                       days: ['Fri'],                        time_window: '5 PM EST', est_time: '10 mins', is_eow: true,  loom_link: 'https://www.loom.com/share/62ac21c700f54d65bdf81751408d5103',    doc_link: 'https://docs.google.com/document/d/1cGWMOvOnSrd0xfhQKe2ctPYP9ZaXHkIcuWJf9iIOkNY/edit?tab=t.0#heading=h.vzbhezazyyz1',                                                             form_link: 'https://k0tk16hntji.typeform.com/to/P2Taxt4X' },
 ]
 
 type CustomTask = {
@@ -233,6 +233,11 @@ export default function TasksPage() {
                   <td className="py-3 pr-4 align-top">
                     <p className="font-medium">{task.name}</p>
                     <p className="text-xs text-gray-400 hidden sm:block">{task.description}</p>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                      {task.loom_link && <a href={task.loom_link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300">Watch tutorial →</a>}
+                      {task.doc_link && <a href={task.doc_link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">View SOP →</a>}
+                      {task.form_link && <a href={task.form_link} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:text-green-300">Submit form →</a>}
+                    </div>
                     <LinkSection taskId={task.id} />
                   </td>
                   <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top">{task.time_window}</td>
@@ -282,6 +287,11 @@ export default function TasksPage() {
                       <p className="font-medium text-sm">{task.name}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>
                       <p className="text-xs text-gray-500 mt-0.5">{task.time_window} · {task.est_time}</p>
+                      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                        {task.loom_link && <a href={task.loom_link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300">Watch tutorial →</a>}
+                        {task.doc_link && <a href={task.doc_link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">View SOP →</a>}
+                        {task.form_link && <a href={task.form_link} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:text-green-300">Submit form →</a>}
+                      </div>
                       <LinkSection taskId={task.id} />
                     </div>
                   </div>
