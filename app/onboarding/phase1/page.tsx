@@ -149,23 +149,31 @@ export default function Phase1Page() {
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Admin member selector */}
-        {isAdmin && members.length > 0 && (
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-6 flex items-center gap-3">
-            <span className="text-sm text-gray-400 flex-shrink-0">Viewing as:</span>
-            <select
-              value={selectedMemberId ?? ''}
-              onChange={e => setSelectedMemberId(e.target.value || null)}
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">— Select a team member —</option>
-              {members.map(m => (
-                <option key={m.id} value={m.id}>
-                  {m.first_name} {m.last_name} ({m.email})
-                </option>
-              ))}
-            </select>
-            {selectedMemberId && (
-              <span className="text-xs text-green-400 flex-shrink-0">Editing their progress</span>
+        {isAdmin && (
+          <div className="bg-blue-950/40 border border-blue-800/50 rounded-xl p-4 mb-6">
+            <p className="text-xs text-blue-300 font-semibold mb-2 uppercase tracking-wide">Admin — Select Team Member</p>
+            {members.length === 0 ? (
+              <p className="text-sm text-gray-400">
+                No members found. <Link href="/admin/users" className="text-blue-400 hover:text-blue-300 underline">Invite members first →</Link>
+              </p>
+            ) : (
+              <div className="flex items-center gap-3">
+                <select
+                  value={selectedMemberId ?? ''}
+                  onChange={e => setSelectedMemberId(e.target.value || null)}
+                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">— Select a team member —</option>
+                  {members.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.first_name} {m.last_name} ({m.email})
+                    </option>
+                  ))}
+                </select>
+                {selectedMemberId && (
+                  <span className="text-xs text-green-400 flex-shrink-0">Editing their progress</span>
+                )}
+              </div>
             )}
           </div>
         )}
