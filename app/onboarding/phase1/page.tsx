@@ -42,11 +42,15 @@ const MEMBER_TASKS = [
   { id: 106, name: 'Send Final Phase 2 Completion Message',   description: 'Post your completion message in the ramp-up thread with time taken',  doc_link: 'https://docs.google.com/document/d/1wG7u-4XwndawIFuB7MMyNkHMeP2l5LZKjk5lmGhzcew/edit?tab=t.oml35f2gtczx#heading=h.k0lg2gbadewb' },
 ]
 
+type Member = { id: string; first_name: string; last_name: string; email: string }
+
 export default function Phase1Page() {
   const [completions, setCompletions] = useState<Record<number, string>>({})
   const [memberCompletions, setMemberCompletions] = useState<Record<number, boolean>>({})
   const [isAdmin, setIsAdmin] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
+  const [members, setMembers] = useState<Member[]>([])
   const [activeTab, setActiveTab] = useState<'founder' | 'member'>('founder')
   const [loading, setLoading] = useState(true)
 
@@ -58,29 +62,56 @@ export default function Phase1Page() {
       setUserId(user.id)
 
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setIsAdmin(profile?.role === 'admin')
+      const admin = profile?.role === 'admin'
+      setIsAdmin(admin)
 
+      if (admin) {
+        const { data: allMembers } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .eq('role', 'member')
+          .order('first_name')
+        setMembers(allMembers ?? [])
+      }
+
+      const targetId = user.id
       const { data: phase1Data } = await supabase
         .from('phase1_completion')
         .select('task_id, status')
-        .eq('user_id', user.id)
+        .eq('user_id', targetId)
 
       const map: Record<number, string> = {}
       phase1Data?.forEach(row => { map[row.task_id] = row.status })
       setCompletions(map)
-
       setLoading(false)
     }
     load()
   }, [])
 
+  useEffect(() => {
+    if (!selectedMemberId) return
+    async function loadMemberCompletions() {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('phase1_completion')
+        .select('task_id, status')
+        .eq('user_id', selectedMemberId)
+      const map: Record<number, string> = {}
+      data?.forEach(row => { map[row.task_id] = row.status })
+      setCompletions(map)
+    }
+    loadMemberCompletions()
+  }, [selectedMemberId])
+
   async function toggleFounderTask(taskId: number, currentStatus: string) {
-    if (!isAdmin || !userId) return
+    if (!isAdmin) return
+    const targetId = selectedMemberId ?? userId
+    if (!targetId) return
     const supabase = createClient()
     const newStatus = currentStatus === 'done' ? 'pending' : 'done'
 
     await supabase.from('phase1_completion').upsert({
-      user_id: userId,
+      user_id: targetId,
       task_id: taskId,
       status: newStatus,
       completed_at: newStatus === 'done' ? new Date().toISOString() : null,
@@ -104,6 +135,28 @@ export default function Phase1Page() {
       </nav>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
+        {/* Admin member selector */}
+        {isAdmin && members.length > 0 && (
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-6 flex items-center gap-3">
+            <span className="text-sm text-gray-400 flex-shrink-0">Viewing as:</span>
+            <select
+              value={selectedMemberId ?? ''}
+              onChange={e => setSelectedMemberId(e.target.value || null)}
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">— Select a team member —</option>
+              {members.map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.first_name} {m.last_name} ({m.email})
+                </option>
+              ))}
+            </select>
+            {selectedMemberId && (
+              <span className="text-xs text-green-400 flex-shrink-0">Editing their progress</span>
+            )}
+          </div>
+        )}
+
         {/* Security Notice */}
         <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-xl p-4 mb-6">
           <h3 className="font-semibold text-yellow-300 mb-2">🔒 Security Requirements</h3>
