@@ -48,7 +48,6 @@ export default function Phase1Page() {
   const [completions, setCompletions] = useState<Record<number, string>>({})
   const [memberCompletions, setMemberCompletions] = useState<Record<number, boolean>>({})
   const [isAdmin, setIsAdmin] = useState(false)
-  const [userId, setUserId] = useState<string | null>(null)
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [activeTab, setActiveTab] = useState<'founder' | 'member'>('founder')
@@ -59,7 +58,7 @@ export default function Phase1Page() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      setUserId(user.id)
+
 
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       const admin = profile?.role === 'admin'
@@ -104,17 +103,31 @@ export default function Phase1Page() {
   }, [selectedMemberId])
 
   async function toggleFounderTask(taskId: number, currentStatus: string) {
-    if (!isAdmin) return
-    const targetId = selectedMemberId ?? userId
-    if (!targetId) return
+    if (!isAdmin || !selectedMemberId) return
     const supabase = createClient()
     const newStatus = currentStatus === 'done' ? 'pending' : 'done'
 
     await supabase.from('phase1_completion').upsert({
-      user_id: targetId,
+      user_id: selectedMemberId,
       task_id: taskId,
       status: newStatus,
       completed_at: newStatus === 'done' ? new Date().toISOString() : null,
+    }, { onConflict: 'user_id,task_id' })
+
+    setCompletions(prev => ({ ...prev, [taskId]: newStatus }))
+  }
+
+  async function markNotNeeded(taskId: number) {
+    if (!isAdmin || !selectedMemberId) return
+    const supabase = createClient()
+    const current = completions[taskId]
+    const newStatus = current === 'not_needed' ? 'pending' : 'not_needed'
+
+    await supabase.from('phase1_completion').upsert({
+      user_id: selectedMemberId,
+      task_id: taskId,
+      status: newStatus,
+      completed_at: null,
     }, { onConflict: 'user_id,task_id' })
 
     setCompletions(prev => ({ ...prev, [taskId]: newStatus }))
@@ -188,38 +201,49 @@ export default function Phase1Page() {
         {activeTab === 'founder' && (
           <div className="space-y-2">
             <p className="text-sm text-gray-400 mb-4">
-              {isAdmin ? 'As admin, you can mark these items done for each team member.' : 'The Founder sets these up for you. You can see the status below.'}
+              {isAdmin ? 'Select a team member above, then mark items done or N/A.' : 'The Founder sets these up for you. You can see the status below.'}
             </p>
+            {isAdmin && !selectedMemberId && (
+              <div className="p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg text-yellow-300 text-sm mb-4">
+                Select a team member from the dropdown above to edit their progress.
+              </div>
+            )}
             {FOUNDER_TASKS.map(task => {
               const status = completions[task.id] ?? 'pending'
               const isDone = status === 'done'
+              const isNA = status === 'not_needed'
               return (
-                <div key={task.id} className={`flex items-start gap-3 p-4 rounded-xl border transition-colors ${isDone ? 'bg-green-900/20 border-green-800/50' : 'bg-gray-900 border-gray-800'}`}>
+                <div key={task.id} className={`flex items-start gap-3 p-4 rounded-xl border transition-colors ${isDone ? 'bg-green-900/20 border-green-800/50' : isNA ? 'bg-gray-800/50 border-gray-700/50' : 'bg-gray-900 border-gray-800'}`}>
                   <button
                     onClick={() => toggleFounderTask(task.id, status)}
-                    disabled={!isAdmin}
-                    className={`mt-0.5 w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center transition-colors ${isDone ? 'bg-green-500 border-green-500' : 'border-gray-600'} ${isAdmin ? 'cursor-pointer hover:border-green-400' : 'cursor-not-allowed'}`}
+                    disabled={!isAdmin || !selectedMemberId || isNA}
+                    className={`mt-0.5 w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center transition-colors ${isDone ? 'bg-green-500 border-green-500' : 'border-gray-600'} ${isAdmin && selectedMemberId && !isNA ? 'cursor-pointer hover:border-green-400' : 'cursor-not-allowed opacity-40'}`}
                   >
                     {isDone && <span className="text-white text-xs">✓</span>}
                   </button>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{task.name}</p>
+                    <p className={`font-medium text-sm ${isNA ? 'line-through text-gray-500' : ''}`}>{task.name}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>
                     <div className="flex items-center gap-3 mt-1.5">
                       <p className="text-xs text-blue-400/70">Access type: {task.login_type}</p>
                       {task.doc_link && (
-                        <a
-                          href={task.doc_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-purple-400 hover:text-purple-300"
-                        >
+                        <a href={task.doc_link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">
                           View SOP →
                         </a>
                       )}
                     </div>
                   </div>
-                  <span className="text-xs text-gray-500 flex-shrink-0">Founder</span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {isAdmin && selectedMemberId && (
+                      <button
+                        onClick={() => markNotNeeded(task.id)}
+                        className={`text-xs px-2 py-0.5 rounded border transition-colors ${isNA ? 'bg-gray-600 border-gray-500 text-gray-300' : 'border-gray-600 text-gray-500 hover:border-gray-400 hover:text-gray-300'}`}
+                      >
+                        {isNA ? 'undo N/A' : 'N/A'}
+                      </button>
+                    )}
+                    {isNA && <span className="text-xs text-gray-500">Not needed</span>}
+                  </div>
                 </div>
               )
             })}

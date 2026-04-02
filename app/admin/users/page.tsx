@@ -35,9 +35,10 @@ export default function UsersPage() {
     setLoading(true)
     setMessage('')
 
-    const domain = process.env.NEXT_PUBLIC_COMPANY_EMAIL_DOMAIN || 'funnelfuturist.com'
-    if (!form.email.endsWith(`@${domain}`)) {
-      setMessage(`Email must be a @${domain} address.`)
+    const allowedDomains = ['funnelfuturist.com', 'joburn.com']
+    const emailDomain = form.email.split('@')[1]
+    if (!allowedDomains.includes(emailDomain)) {
+      setMessage(`Email must be a @funnelfuturist.com or @joburn.com address.`)
       setLoading(false)
       return
     }
