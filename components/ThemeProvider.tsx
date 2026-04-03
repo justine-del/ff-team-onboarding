@@ -39,7 +39,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
         <button
           onClick={cycleTheme}
           title="Switch theme"
-          className="fixed top-3 right-3 z-40 w-8 h-8 flex items-center justify-center bg-gray-800/80 backdrop-blur border border-gray-700/60 rounded-full shadow text-sm hover:bg-gray-700 transition-colors"
+          className="fixed bottom-4 left-4 z-40 w-8 h-8 flex items-center justify-center bg-gray-800/80 backdrop-blur border border-gray-700/60 rounded-full shadow text-sm hover:bg-gray-700 transition-colors"
         >
           {ICONS[theme]}
         </button>
