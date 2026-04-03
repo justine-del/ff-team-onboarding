@@ -31,6 +31,47 @@ function timeBadgeClass(mins: number): string {
   return 'bg-purple-900/40 border-purple-700/50 text-purple-300'
 }
 
+function buildSemanticHtml(reportText: string): string {
+  let html = ''
+  let inTable = false
+  let headerCells: string[] = []
+
+  for (const line of reportText.split('\n')) {
+    const t = line.trim()
+    if (!t) {
+      if (inTable) { html += '</tbody></table>'; inTable = false }
+      html += '<br>'; continue
+    }
+    const bold = (s: string) => s.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    if (t.startsWith('|') && t.endsWith('|')) {
+      if (/^\|[\s\-|]+\|$/.test(t)) continue
+      const cells = t.slice(1, -1).split('|').map(c => c.trim())
+      if (!inTable) {
+        headerCells = cells
+        html += '<table><thead><tr>' + cells.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>'
+        inTable = true
+      } else {
+        html += '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>'
+      }
+      continue
+    }
+    if (inTable) { html += '</tbody></table>'; inTable = false }
+    const hm = t.match(/^\*\*(.*?)\*\*$/)
+    if (hm) {
+      const text = hm[1]
+      html += text.toLowerCase().includes('eow performance') ? `<h1>${text}</h1>` : `<h2>${text}</h2>`
+      continue
+    }
+    if (t.startsWith('- ') || t.startsWith('• ')) { html += `<li>${bold(t.slice(2))}</li>`; continue }
+    if (t.startsWith('  - ') || t.startsWith('  • ')) { html += `<li>${bold(t.slice(4))}</li>`; continue }
+    html += `<p>${bold(t)}</p>`
+  }
+  if (inTable) html += '</tbody></table>'
+  // suppress unused warning
+  void headerCells
+  return html
+}
+
 function buildReportHtml(reportText: string, memberName: string, weekOf: string): string {
   const lines = reportText.split('\n')
   let body = ''
@@ -794,14 +835,24 @@ export default function TasksPage() {
                 {reportText && !generatingReport && (
                   <>
                     <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(reportText)
+                      onClick={async () => {
+                        try {
+                          const html = buildSemanticHtml(reportText)
+                          await navigator.clipboard.write([
+                            new ClipboardItem({
+                              'text/html': new Blob([html], { type: 'text/html' }),
+                              'text/plain': new Blob([reportText], { type: 'text/plain' }),
+                            })
+                          ])
+                        } catch {
+                          await navigator.clipboard.writeText(reportText)
+                        }
                         setCopied(true)
                         setTimeout(() => setCopied(false), 2000)
                       }}
                       className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors"
                     >
-                      {copied ? 'Copied!' : 'Copy'}
+                      {copied ? 'Copied!' : 'Copy for Google Docs'}
                     </button>
                   </>
                 )}
