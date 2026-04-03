@@ -13,6 +13,9 @@ type Member = {
   job_role: string | null
   start_date: string | null
   role: string
+  phase1Done?: number
+  phase2Done?: number
+  sopsD?: number
 }
 
 export default function AdminPage() {
@@ -35,7 +38,23 @@ export default function AdminPage() {
         .eq('role', 'member')
         .order('created_at', { ascending: false })
 
-      setMembers(allMembers ?? [])
+      if (!allMembers?.length) { setLoading(false); return }
+
+      // Fetch completion counts for all members
+      const [p1, p2, sops] = await Promise.all([
+        supabase.from('phase1_completion').select('user_id').eq('status', 'done').in('user_id', allMembers.map(m => m.id)),
+        supabase.from('lesson_completion').select('user_id').eq('completed', true).in('user_id', allMembers.map(m => m.id)),
+        supabase.from('sop_completion').select('user_id').eq('completed', true).in('user_id', allMembers.map(m => m.id)),
+      ])
+
+      const count = (data: {user_id: string}[] | null, id: string) => data?.filter(r => r.user_id === id).length ?? 0
+
+      setMembers(allMembers.map(m => ({
+        ...m,
+        phase1Done: count(p1.data, m.id),
+        phase2Done: count(p2.data, m.id),
+        sopsD: count(sops.data, m.id),
+      })))
       setLoading(false)
     }
     load()
@@ -92,9 +111,15 @@ export default function AdminPage() {
                     <td className="py-3 pr-4 text-gray-400">
                       {member.start_date ? new Date(member.start_date).toLocaleDateString() : '—'}
                     </td>
-                    <td className="py-3 pr-4 text-gray-300">—/18</td>
-                    <td className="py-3 pr-4 text-gray-300">—/17</td>
-                    <td className="py-3 pr-4 text-gray-300">—/10</td>
+                    <td className="py-3 pr-4">
+                      <span className={member.phase1Done === 18 ? 'text-green-400' : 'text-gray-300'}>{member.phase1Done}/18</span>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <span className={member.phase2Done === 17 ? 'text-green-400' : 'text-gray-300'}>{member.phase2Done}/17</span>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <span className={member.sopsD === 10 ? 'text-green-400' : 'text-gray-300'}>{member.sopsD}/10</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
