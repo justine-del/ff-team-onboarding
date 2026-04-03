@@ -107,19 +107,20 @@ async function getToken(): Promise<string | null> {
   }
 }
 
-async function deleteOldReports(memberName: string, folderId: string, token: string) {
+async function purgeAllOwnedFiles(token: string) {
   try {
-    const q = encodeURIComponent(`name contains 'EOW Report — ${memberName}' and '${folderId}' in parents and trashed=false`)
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    // List ALL files owned by the service account
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent("'me' in owners and trashed=false")}&fields=files(id)&pageSize=100`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
     const data = await res.json()
-    for (const file of data.files ?? []) {
-      await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?supportsAllDrives=true`, {
+    await Promise.all((data.files ?? []).map((f: { id: string }) =>
+      fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })
-    }
+    ))
   } catch {
     // non-fatal
   }
@@ -138,8 +139,8 @@ export async function POST(req: NextRequest) {
     const fileName = `EOW Report — ${memberName} — ${weekOf}`
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID
 
-    // Delete old reports for this member to free up quota
-    if (folderId) await deleteOldReports(memberName, folderId, token)
+    // Purge all files owned by service account to free storage quota
+    await purgeAllOwnedFiles(token)
 
     const boundary = `boundary_${Date.now()}`
     const metadata = JSON.stringify({
