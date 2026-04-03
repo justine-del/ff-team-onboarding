@@ -49,7 +49,10 @@ Total: ${weeklyHours}h logged across the week.
 **Notes / Blockers**
 Any days off or anything worth flagging. If no blockers, write "None."
 
-Keep it professional, clear, and under 300 words. Do not add extra commentary outside the report format.`
+**Message to Founder**
+A short, professional 2-3 sentence personal message from ${memberName} to their founder. Should reflect on the week, express commitment, flag anything they want the founder to know, and close positively.
+
+Keep it professional, clear, and under 350 words. Do not add extra commentary outside the report format.`
 
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
