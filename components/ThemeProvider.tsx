@@ -12,12 +12,6 @@ const ICONS: Record<Theme, string> = {
   nightlight: '🌙',
 }
 
-const LABELS: Record<Theme, string> = {
-  dark: 'Dark',
-  light: 'Light',
-  nightlight: 'Night',
-}
-
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('dark')
   const [mounted, setMounted] = useState(false)
@@ -44,11 +38,10 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
       {mounted && (
         <button
           onClick={cycleTheme}
-          title={`Theme: ${LABELS[theme]} — click to switch`}
-          className="fixed bottom-4 right-4 z-50 flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white text-xs px-3 py-2 rounded-full shadow-lg transition-colors"
+          title="Switch theme"
+          className="fixed top-3 right-3 z-40 w-8 h-8 flex items-center justify-center bg-gray-800/80 backdrop-blur border border-gray-700/60 rounded-full shadow text-sm hover:bg-gray-700 transition-colors"
         >
-          <span>{ICONS[theme]}</span>
-          <span>{LABELS[theme]}</span>
+          {ICONS[theme]}
         </button>
       )}
     </>

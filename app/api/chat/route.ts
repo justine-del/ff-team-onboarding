@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
+import { getDriveContext } from '@/lib/google-drive'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -67,10 +68,16 @@ export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json()
 
+    // Optionally append live Google Drive SOP content
+    const driveContext = await getDriveContext()
+    const system = driveContext
+      ? `${SYSTEM_PROMPT}\n\n## Live SOP Documents (from Google Drive)\n\n${driveContext}`
+      : SYSTEM_PROMPT
+
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
-      system: SYSTEM_PROMPT,
+      system,
       messages,
     })
 
