@@ -1,27 +1,47 @@
-import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
-import { redirect } from 'next/navigation'
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
-export default async function AdminPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+type Member = {
+  id: string
+  email: string
+  first_name: string
+  last_name: string
+  job_role: string | null
+  start_date: string | null
+  role: string
+}
 
-  const adminDb = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+export default function AdminPage() {
+  const [members, setMembers] = useState<Member[]>([])
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
-  const { data: profile } = await adminDb.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') redirect('/dashboard')
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
 
-  const { data: members } = await adminDb
-    .from('profiles')
-    .select('*')
-    .eq('role', 'member')
-    .order('created_at', { ascending: false })
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      if (profile?.role !== 'admin') { router.push('/dashboard'); return }
+
+      const { data: allMembers } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'member')
+        .order('created_at', { ascending: false })
+
+      setMembers(allMembers ?? [])
+      setLoading(false)
+    }
+    load()
+  }, [router])
+
+  if (loading) return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">Loading...</div>
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -43,7 +63,7 @@ export default async function AdminPage() {
       <main className="max-w-6xl mx-auto px-4 py-8">
         <h2 className="text-xl font-semibold mb-6">Team Onboarding Progress</h2>
 
-        {!members?.length ? (
+        {!members.length ? (
           <div className="text-center py-12 text-gray-400">
             <p className="mb-4">No team members yet.</p>
             <Link href="/admin/users" className="text-blue-400 hover:text-blue-300">Invite your first member →</Link>
@@ -59,34 +79,22 @@ export default async function AdminPage() {
                   <th className="py-3 pr-4 text-gray-400 font-medium">Phase 1</th>
                   <th className="py-3 pr-4 text-gray-400 font-medium">Phase 2</th>
                   <th className="py-3 pr-4 text-gray-400 font-medium">SOPs</th>
-                  <th className="py-3 pr-4 text-gray-400 font-medium">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {members.map(member => (
                   <tr key={member.id} className="border-b border-gray-800/50 hover:bg-gray-900/50">
                     <td className="py-3 pr-4">
-                      <Link href={`/admin/users/${member.id}`} className="font-medium hover:text-blue-400">
-                        {member.first_name} {member.last_name}
-                      </Link>
+                      <p className="font-medium">{member.first_name} {member.last_name}</p>
                       <p className="text-xs text-gray-400">{member.email}</p>
                     </td>
                     <td className="py-3 pr-4 text-gray-400">{member.job_role ?? '—'}</td>
                     <td className="py-3 pr-4 text-gray-400">
                       {member.start_date ? new Date(member.start_date).toLocaleDateString() : '—'}
                     </td>
-                    <td className="py-3 pr-4">
-                      <span className="text-gray-300">—/18</span>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className="text-gray-300">—/17</span>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className="text-gray-300">—/10</span>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className="px-2 py-0.5 rounded text-xs bg-gray-700 text-gray-300">On Track</span>
-                    </td>
+                    <td className="py-3 pr-4 text-gray-300">—/18</td>
+                    <td className="py-3 pr-4 text-gray-300">—/17</td>
+                    <td className="py-3 pr-4 text-gray-300">—/10</td>
                   </tr>
                 ))}
               </tbody>
