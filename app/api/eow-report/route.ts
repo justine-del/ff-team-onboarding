@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       .map(([day, type]) => `${day} (${type === 'half' ? 'half day' : 'day off'})`)
       .join(', ')
 
-    const prompt = `You are writing a professional end-of-week performance report for a virtual assistant named ${memberName}.
+    const prompt = `You are writing a professional end-of-week performance report in the FIRST PERSON (I/me/my) as if ${memberName} is writing it themselves. Never use third-person ("she", "he", "they", "${memberName} completed..."). Always write as "I completed...", "I worked on...", "My focus was...", etc.
 
 Week of: ${weekOf}
 Total hours logged: ${weeklyHours}h
