@@ -369,19 +369,19 @@ export default function TasksPage() {
                   const isOff = dayOffs[d] === 'off'
                   const isHalf = dayOffs[d] === 'half'
                   return (
-                    <th key={d} className={`text-center py-2 px-1 font-medium w-12 ${d === today ? 'text-blue-400' : 'text-gray-400'}`}>
-                      <div>{d}</div>
+                    <th key={d} className={`text-center py-1 px-1 font-medium w-12`}>
                       {!selectedMemberId ? (
                         <button
                           onClick={() => toggleDayOff(d)}
                           title="Click to mark day off / half day"
-                          className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded transition-colors w-full ${
+                          className={`w-full rounded-lg px-1 py-1.5 transition-colors ${
                             isOff ? 'bg-red-900/50 text-red-400 hover:bg-red-900/70' :
                             isHalf ? 'bg-yellow-900/50 text-yellow-400 hover:bg-yellow-900/70' :
-                            'text-gray-700 hover:text-gray-500 hover:bg-gray-800'
+                            d === today ? 'text-blue-400 hover:bg-gray-800' : 'text-gray-400 hover:bg-gray-800'
                           }`}
                         >
-                          {isOff ? 'OFF' : isHalf ? '½' : '·'}
+                          <div className="font-medium">{d}</div>
+                          <div className="text-[10px] mt-0.5">{isOff ? 'OFF' : isHalf ? '½ day' : ''}</div>
                         </button>
                       ) : (
                         <div className={`text-[10px] mt-0.5 ${isOff ? 'text-red-400' : isHalf ? 'text-yellow-400' : 'text-transparent'}`}>
