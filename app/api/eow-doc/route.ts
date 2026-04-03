@@ -5,59 +5,87 @@ function reportToHtml(reportText: string, memberName: string, weekOf: string): s
   const lines = reportText.split('\n')
   let html = `
     <html><head><meta charset="UTF-8"></head>
-    <body style="font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; color: #111;">
+    <body style="font-family: Arial, sans-serif; max-width: 820px; margin: 40px auto; color: #111; line-height: 1.6;">
   `
   let inList = false
+  let inTable = false
+  let tableRowCount = 0
+
+  const closeList = () => { if (inList) { html += '</ul>'; inList = false } }
+  const closeTable = () => { if (inTable) { html += '</tbody></table>'; inTable = false; tableRowCount = 0 } }
 
   for (const line of lines) {
     const trimmed = line.trim()
 
     if (!trimmed) {
-      if (inList) { html += '</ul>'; inList = false }
+      closeList(); closeTable()
       html += '<br>'
       continue
     }
 
+    // Markdown table row: | col | col | ...
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      // Skip separator rows like |---|---|
+      if (/^\|[\s\-|]+\|$/.test(trimmed)) continue
+      closeList()
+      const cells = trimmed.slice(1, -1).split('|').map(c => c.trim())
+      if (!inTable) {
+        html += `<table style="border-collapse:collapse; width:100%; margin: 12px 0;">
+          <thead><tr style="background:#1a1a2e; color:#fff;">`
+        cells.forEach(c => { html += `<th style="padding:8px 12px; text-align:left; font-size:13px;">${c}</th>` })
+        html += `</tr></thead><tbody>`
+        inTable = true
+        tableRowCount = 0
+      } else {
+        const bg = tableRowCount % 2 === 0 ? '#f9f9f9' : '#ffffff'
+        html += `<tr style="background:${bg};">`
+        cells.forEach(c => { html += `<td style="padding:7px 12px; border-bottom:1px solid #e0e0e0; font-size:13px;">${c}</td>` })
+        html += `</tr>`
+        tableRowCount++
+      }
+      continue
+    }
+
+    closeTable()
+
     // Standalone **text** = header
     const headerMatch = trimmed.match(/^\*\*(.*?)\*\*$/)
     if (headerMatch) {
-      if (inList) { html += '</ul>'; inList = false }
+      closeList()
       const text = headerMatch[1]
       if (text.toLowerCase().includes('eow performance report')) {
-        html += `<h1 style="font-size: 22px; color: #1a1a2e; border-bottom: 2px solid #333; padding-bottom: 8px;">${text}</h1>`
+        html += `<h1 style="font-size:22px; color:#1a1a2e; border-bottom:3px solid #1a1a2e; padding-bottom:8px; margin-bottom:20px;">${text}</h1>`
       } else {
-        html += `<h2 style="font-size: 16px; color: #222; margin-top: 24px; margin-bottom: 4px;">${text}</h2>`
+        html += `<h2 style="font-size:15px; color:#1a1a2e; margin-top:28px; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">${text}</h2>`
       }
       continue
     }
 
     // List items
     if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
-      if (!inList) { html += '<ul style="margin: 4px 0; padding-left: 20px;">'; inList = true }
+      if (!inList) { html += '<ul style="margin:6px 0; padding-left:22px;">'; inList = true }
       const content = trimmed.slice(2).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      html += `<li style="margin: 3px 0;">${content}</li>`
+      html += `<li style="margin:4px 0; font-size:13px;">${content}</li>`
       continue
     }
 
-    // Numbered list
-    const numMatch = trimmed.match(/^(\d+)\.\s+(.+)/)
-    if (numMatch) {
-      if (inList) { html += '</ul>'; inList = false }
-      const content = numMatch[2].replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      html += `<p style="margin: 4px 0;">${numMatch[1]}. ${content}</p>`
+    // Indented list items (for nested)
+    if (trimmed.startsWith('  - ') || line.startsWith('  - ')) {
+      if (!inList) { html += '<ul style="margin:4px 0; padding-left:22px;">'; inList = true }
+      const content = trimmed.replace(/^\s*-\s*/, '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      html += `<li style="margin:3px 0; font-size:13px; color:#444;">${content}</li>`
       continue
     }
 
-    // Regular paragraph
-    if (inList) { html += '</ul>'; inList = false }
+    closeList()
     const content = trimmed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    html += `<p style="margin: 6px 0; line-height: 1.6;">${content}</p>`
+    html += `<p style="margin:5px 0; font-size:13px;">${content}</p>`
   }
 
-  if (inList) html += '</ul>'
+  closeList(); closeTable()
   html += `
-    <br><hr style="border: none; border-top: 1px solid #ddd; margin-top: 32px;">
-    <p style="font-size: 11px; color: #999;">Generated via Cyborg VA Portal — ${memberName} — ${weekOf}</p>
+    <br><hr style="border:none; border-top:1px solid #ddd; margin-top:32px;">
+    <p style="font-size:11px; color:#aaa;">Generated via Cyborg VA Portal · ${memberName} · ${weekOf}</p>
     </body></html>
   `
   return html

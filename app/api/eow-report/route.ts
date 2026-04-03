@@ -7,15 +7,38 @@ export async function POST(req: NextRequest) {
   try {
     const { memberName, weekOf, tasks, weeklyHours, dayOffs } = await req.json()
 
-    const taskLines = tasks
-      .filter((t: { totalMins: number; name: string; days: string[]; loggedDays: Record<string, number> }) => t.totalMins > 0 || t.days.length > 0)
-      .map((t: { name: string; days: string[]; loggedDays: Record<string, number>; totalMins: number }) => {
-        const daySummary = t.days
-          .map((d: string) => `${d}: ${t.loggedDays[d] ? formatTime(t.loggedDays[d]) : '—'}`)
-          .join(', ')
-        return `- ${t.name} | ${daySummary} | Total: ${formatTime(t.totalMins)}`
-      })
+    type Task = { name: string; days: string[]; loggedDays: Record<string, number>; totalMins: number }
+    const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+    // Build per-day stats
+    const dayStats = DAYS.map(day => {
+      const scheduledTasks = (tasks as Task[]).filter(t => t.days.includes(day))
+      const completedTasks = scheduledTasks.filter(t => (t.loggedDays[day] ?? 0) > 0)
+      const rate = scheduledTasks.length > 0
+        ? ((completedTasks.length / scheduledTasks.length) * 100).toFixed(1)
+        : '—'
+      const isOff = dayOffs?.[day]
+      return {
+        day,
+        total: scheduledTasks.length,
+        completed: completedTasks.length,
+        rate,
+        isOff,
+        missedTasks: scheduledTasks.filter(t => (t.loggedDays[day] ?? 0) === 0).map(t => t.name),
+      }
+    })
+
+    const tableText = dayStats
+      .map(d => `${d.day} | ${d.total} | ${d.completed} | ${d.isOff ? `(${d.isOff === 'half' ? 'Half Day Off' : 'Day Off'})` : d.rate + '%'}`)
       .join('\n')
+
+    const missedByDay = dayStats
+      .filter(d => d.missedTasks.length > 0 && !d.isOff)
+      .map(d => `  - ${d.day}: ${d.missedTasks.join(', ')}`)
+      .join('\n')
+
+    const goodDays = dayStats.filter(d => d.rate === '100.0' && !d.isOff).map(d => d.day)
+    const badDays = dayStats.filter(d => d.completed < d.total && d.total > 0 && !d.isOff).map(d => d.day)
 
     const offDays = Object.entries(dayOffs as Record<string, string>)
       .map(([day, type]) => `${day} (${type === 'half' ? 'half day' : 'day off'})`)
@@ -27,36 +50,52 @@ Week of: ${weekOf}
 Total hours logged: ${weeklyHours}h
 ${offDays ? `Days off/half days: ${offDays}` : ''}
 
-Task breakdown:
-${taskLines || 'No tasks logged this week.'}
+Daily completion data:
+Day | Total Tasks | Completed | Rate
+${tableText}
 
-Write a concise, professional EOW report in this format:
+Days with 100% completion: ${goodDays.join(', ') || 'None'}
+Days with missed tasks: ${badDays.join(', ') || 'None'}
+${missedByDay ? `Missed tasks by day:\n${missedByDay}` : ''}
+
+Write a professional EOW report using EXACTLY this format and structure:
 
 **EOW Performance Report — ${memberName} — Week of ${weekOf}**
 
-**Summary**
-2-3 sentences summarizing the week's output and overall performance.
+**1. Daily Task Completion Table**
 
-**Tasks Completed**
-Bullet list of tasks that had time logged, with time spent.
+| Day | Total Tasks | Completed Tasks | Completion Rate (%) |
+|---|---|---|---|
+[Fill in each row using the data provided above. For days off, write the day off type in the Completion Rate column instead of a percentage.]
 
-**Hours Breakdown**
-Total: ${weeklyHours}h logged across the week.
+**2. Key Takeaways**
 
-**Highlights**
-1-2 things done well or notable this week.
+- Days Performed Well: [List days with 100% or strong completion. Be specific.]
+- Days with Issues:
+  [For each day with missed tasks, list which specific tasks were missed.]
+- Patterns Noticed:
+  [1-2 observations about patterns in completion across the week.]
 
-**Notes / Blockers**
-Any days off or anything worth flagging. If no blockers, write "None."
+**3. Recommendations**
 
-**Message to Founder**
-A short, professional 2-3 sentence personal message from ${memberName} to their founder. Should reflect on the week, express commitment, flag anything they want the founder to know, and close positively.
+[2-3 specific, actionable bullet points based on the week's performance.]
 
-Keep it professional, clear, and under 350 words. Do not add extra commentary outside the report format.`
+**4. Professional Message to Founder**
+
+Subject: Weekly Performance Summary — ${weekOf}
+
+Hi [Founder],
+
+[2-3 sentences: briefly summarize the week's overall performance, mention anything notable or something to flag, and close with a forward-looking commitment for next week.]
+
+Best regards,
+${memberName}
+
+Keep the tone professional and honest. Use only the data provided. Do not invent tasks or numbers.`
 
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
+      max_tokens: 1500,
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -75,3 +114,6 @@ function formatTime(mins: number): string {
   const m = mins % 60
   return m > 0 ? `${h}h${m}m` : `${h}h`
 }
+
+// suppress unused warning
+void formatTime
