@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const TIME_OPTIONS = [0, 5, 10, 15, 30, 60, 90, 120, 180, 240, 300, 360]
 
 const DEFAULT_TASKS = [
   { id: 1, sop_number: '1',     name: 'Understanding Your Core Sheet',    description: 'Review and understand the updates in your core tracking sheet',            days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '8 PM EST', est_time: '10 mins', is_eow: false, loom_link: 'https://www.loom.com/share/6407bed964d14db8a26374c028bc4970',    doc_link: 'https://docs.google.com/document/d/1NpFOIAjPa_pKZ8o6L7qfyCj4XSpAwv_St1H1GfsCuSQ/edit?tab=t.0',                                                                                    form_link: null },
@@ -13,6 +14,22 @@ const DEFAULT_TASKS = [
   { id: 4, sop_number: 'EOW-2', name: 'EOW VA Clear Out and Restart',     description: 'Clear your workspace and prepare for the new week',                         days: ['Fri'],                        time_window: '5 PM EST', est_time: '10 mins', is_eow: true,  loom_link: 'https://www.loom.com/share/0f1c078502d147038bd619e2b4e5bc4c',    doc_link: 'https://docs.google.com/document/d/1dgN71db7r0vbT3pvwyF_5fSs4f-VnmkWNwBvVv1IE7A/edit?tab=t.0#heading=h.el8shvjenf8a',                                                              form_link: null },
   { id: 5, sop_number: 'EOW-3', name: 'EOW FF Support Form Submission',   description: 'Submit the Funnel Futurist end-of-week support form',                       days: ['Fri'],                        time_window: '5 PM EST', est_time: '10 mins', is_eow: true,  loom_link: 'https://www.loom.com/share/62ac21c700f54d65bdf81751408d5103',    doc_link: 'https://docs.google.com/document/d/1cGWMOvOnSrd0xfhQKe2ctPYP9ZaXHkIcuWJf9iIOkNY/edit?tab=t.0#heading=h.vzbhezazyyz1',                                                             form_link: 'https://k0tk16hntji.typeform.com/to/P2Taxt4X' },
 ]
+
+function formatTime(mins: number): string {
+  if (!mins) return '—'
+  if (mins < 60) return `${mins}m`
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return m > 0 ? `${h}h${m}m` : `${h}h`
+}
+
+function timeBadgeClass(mins: number): string {
+  if (!mins) return 'bg-gray-800/50 border-gray-700 text-gray-600'
+  if (mins <= 30) return 'bg-yellow-900/40 border-yellow-700/50 text-yellow-300'
+  if (mins <= 90) return 'bg-blue-900/40 border-blue-700/50 text-blue-300'
+  if (mins <= 240) return 'bg-green-900/40 border-green-700/50 text-green-300'
+  return 'bg-purple-900/40 border-purple-700/50 text-purple-300'
+}
 
 type CustomTask = {
   id: number
@@ -44,7 +61,8 @@ function getMonday() {
 type Member = { id: string; first_name: string; last_name: string; email: string }
 
 export default function TasksPage() {
-  const [completions, setCompletions] = useState<Record<string, boolean>>({})
+  const [completions, setCompletions] = useState<Record<string, number>>({})
+  const [dayOffs, setDayOffs] = useState<Record<string, string>>({})
   const [vaLinks, setVALinks] = useState<Record<number, VALink>>({})
   const [expandedLinks, setExpandedLinks] = useState<number | null>(null)
   const [customTasks, setCustomTasks] = useState<CustomTask[]>([])
@@ -63,6 +81,10 @@ export default function TasksPage() {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'short' })
 
   const viewingId = selectedMemberId ?? userId
+
+  // Weekly hours calculation
+  const weeklyMinutes = Object.entries(completions).reduce((sum, [, mins]) => sum + (mins || 0), 0)
+  const weeklyHours = (weeklyMinutes / 60).toFixed(1)
 
   useEffect(() => {
     async function load() {
@@ -89,15 +111,27 @@ export default function TasksPage() {
     if (!viewingId) return
     async function loadData() {
       const supabase = createClient()
-      const [completionData, linkData, customData] = await Promise.all([
-        supabase.from('task_completions').select('task_id, day, completed').eq('user_id', viewingId).eq('week_start', weekStart),
+      const [completionData, linkData, customData, dayOffData] = await Promise.all([
+        supabase.from('task_completions').select('task_id, day, completed, time_spent').eq('user_id', viewingId).eq('week_start', weekStart),
         supabase.from('va_task_links').select('task_id, loom_link, sop_doc_link').eq('user_id', viewingId),
         supabase.from('va_custom_tasks').select('*').eq('user_id', viewingId).eq('active', true),
+        supabase.from('day_off').select('day, type').eq('user_id', viewingId).eq('week_start', weekStart),
       ])
 
-      const map: Record<string, boolean> = {}
-      completionData.data?.forEach(row => { map[`${row.task_id}-${row.day}`] = row.completed })
+      const map: Record<string, number> = {}
+      completionData.data?.forEach(row => {
+        const mins = row.time_spent ?? (row.completed ? 30 : 0)
+        if (row.task_id > 10000) {
+          map[`custom-${row.task_id - 10000}-${row.day}`] = mins
+        } else {
+          map[`${row.task_id}-${row.day}`] = mins
+        }
+      })
       setCompletions(map)
+
+      const dayOffMap: Record<string, string> = {}
+      dayOffData.data?.forEach(row => { dayOffMap[row.day] = row.type })
+      setDayOffs(dayOffMap)
 
       const links: Record<number, VALink> = {}
       linkData.data?.forEach(row => { links[row.task_id] = row })
@@ -112,13 +146,49 @@ export default function TasksPage() {
     loadData()
   }, [viewingId, weekStart])
 
-  async function toggleTask(taskId: number, day: string) {
-    if (!userId) return
+  async function setTaskTime(taskId: number, day: string, minutes: number) {
+    if (!userId || !!selectedMemberId) return
+    const supabase = createClient()
+    const key = taskId > 10000 ? `custom-${taskId - 10000}-${day}` : `${taskId}-${day}`
+    await supabase.from('task_completions').upsert({
+      user_id: userId, task_id: taskId, week_start: weekStart, day,
+      time_spent: minutes, completed: minutes > 0,
+      completed_at: minutes > 0 ? new Date().toISOString() : null
+    }, { onConflict: 'user_id,task_id,week_start,day' })
+    setCompletions(prev => ({ ...prev, [key]: minutes }))
+  }
+
+  // EOW tasks use binary toggle
+  async function toggleEOWTask(taskId: number, day: string) {
+    if (!userId || !!selectedMemberId) return
     const supabase = createClient()
     const key = `${taskId}-${day}`
-    const newVal = !completions[key]
-    await supabase.from('task_completions').upsert({ user_id: userId, task_id: taskId, week_start: weekStart, day, completed: newVal, completed_at: newVal ? new Date().toISOString() : null }, { onConflict: 'user_id,task_id,week_start,day' })
+    const current = completions[key] ?? 0
+    const newVal = current > 0 ? 0 : 30
+    await supabase.from('task_completions').upsert({
+      user_id: userId, task_id: taskId, week_start: weekStart, day,
+      time_spent: newVal, completed: newVal > 0,
+      completed_at: newVal > 0 ? new Date().toISOString() : null
+    }, { onConflict: 'user_id,task_id,week_start,day' })
     setCompletions(prev => ({ ...prev, [key]: newVal }))
+  }
+
+  async function toggleDayOff(day: string) {
+    if (!userId || !!selectedMemberId) return
+    const supabase = createClient()
+    const current = dayOffs[day]
+    let next: string | null = null
+    if (!current) next = 'off'
+    else if (current === 'off') next = 'half'
+    else next = null
+
+    if (next) {
+      await supabase.from('day_off').upsert({ user_id: userId, week_start: weekStart, day, type: next }, { onConflict: 'user_id,week_start,day' })
+      setDayOffs(prev => ({ ...prev, [day]: next! }))
+    } else {
+      await supabase.from('day_off').delete().eq('user_id', userId).eq('week_start', weekStart).eq('day', day)
+      setDayOffs(prev => { const n = { ...prev }; delete n[day]; return n })
+    }
   }
 
   async function saveVALink(taskId: number) {
@@ -237,7 +307,7 @@ export default function TasksPage() {
         )}
 
         {/* Core 4 Banner */}
-        <div className="bg-blue-900/30 border border-blue-700/50 rounded-xl p-4 mb-6">
+        <div className="bg-blue-900/30 border border-blue-700/50 rounded-xl p-4 mb-4">
           <h3 className="font-semibold text-blue-300 mb-2">The Core 4 Rules</h3>
           <ol className="space-y-1">
             {[
@@ -254,11 +324,37 @@ export default function TasksPage() {
         </div>
 
         {/* Task Completion Clarity */}
-        <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-xl p-3 mb-6">
+        <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-xl p-3 mb-4">
           <p className="text-sm text-yellow-200/80">
             <span className="font-semibold text-yellow-300">Task Completion Clarity:</span> A task is only complete after the Communication Text has been sent (if one is required). Failure to send = grounds for performance review.
           </p>
         </div>
+
+        {/* Weekly Hours Summary */}
+        <div className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 mb-6">
+          <div className="text-sm text-gray-400">
+            Week of {monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Hours logged:</span>
+              <span className={`text-sm font-semibold ${weeklyMinutes > 0 ? 'text-green-400' : 'text-gray-600'}`}>
+                {weeklyHours}h
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-gray-600">
+              <span className="w-2 h-2 rounded-full bg-yellow-500/60 inline-block"></span><span>≤30m</span>
+              <span className="w-2 h-2 rounded-full bg-blue-500/60 inline-block ml-1"></span><span>≤90m</span>
+              <span className="w-2 h-2 rounded-full bg-green-500/60 inline-block ml-1"></span><span>≤4h</span>
+              <span className="w-2 h-2 rounded-full bg-purple-500/60 inline-block ml-1"></span><span>4h+</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Day off legend */}
+        {!selectedMemberId && (
+          <p className="text-xs text-gray-600 mb-3">Click a day header to mark as <span className="text-red-400">OFF</span> → click again for <span className="text-yellow-400">½ day</span> → click again to clear.</p>
+        )}
 
         {/* Default Tasks Table */}
         <div className="overflow-x-auto mb-8">
@@ -267,11 +363,34 @@ export default function TasksPage() {
               <tr className="border-b border-gray-800">
                 <th className="text-left py-2 pr-4 text-gray-400 font-medium w-8">#</th>
                 <th className="text-left py-2 pr-4 text-gray-400 font-medium">Task</th>
-                <th className="text-left py-2 pr-4 text-gray-400 font-medium hidden md:table-cell">Time</th>
+                <th className="text-left py-2 pr-4 text-gray-400 font-medium hidden md:table-cell">Window</th>
                 <th className="text-left py-2 pr-4 text-gray-400 font-medium hidden md:table-cell">Est.</th>
-                {DAYS.map(d => (
-                  <th key={d} className={`text-center py-2 px-2 font-medium w-10 ${d === today ? 'text-blue-400' : 'text-gray-400'}`}>{d}</th>
-                ))}
+                {DAYS.map(d => {
+                  const isOff = dayOffs[d] === 'off'
+                  const isHalf = dayOffs[d] === 'half'
+                  return (
+                    <th key={d} className={`text-center py-2 px-1 font-medium w-12 ${d === today ? 'text-blue-400' : 'text-gray-400'}`}>
+                      <div>{d}</div>
+                      {!selectedMemberId ? (
+                        <button
+                          onClick={() => toggleDayOff(d)}
+                          title="Click to mark day off / half day"
+                          className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded transition-colors w-full ${
+                            isOff ? 'bg-red-900/50 text-red-400 hover:bg-red-900/70' :
+                            isHalf ? 'bg-yellow-900/50 text-yellow-400 hover:bg-yellow-900/70' :
+                            'text-gray-700 hover:text-gray-500 hover:bg-gray-800'
+                          }`}
+                        >
+                          {isOff ? 'OFF' : isHalf ? '½' : '·'}
+                        </button>
+                      ) : (
+                        <div className={`text-[10px] mt-0.5 ${isOff ? 'text-red-400' : isHalf ? 'text-yellow-400' : 'text-transparent'}`}>
+                          {isOff ? 'OFF' : isHalf ? '½' : '·'}
+                        </div>
+                      )}
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
@@ -288,24 +407,28 @@ export default function TasksPage() {
                     </div>
                     <LinkSection taskId={task.id} />
                   </td>
-                  <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top">{task.time_window}</td>
-                  <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top">{task.est_time}</td>
+                  <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.time_window}</td>
+                  <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
                   {DAYS.map(d => {
                     const isTaskDay = task.days.includes(d)
+                    const isOff = dayOffs[d] === 'off'
                     const key = `${task.id}-${d}`
-                    const done = completions[key] ?? false
+                    const mins = completions[key] ?? 0
                     return (
-                      <td key={d} className="text-center py-3 px-2 align-top">
-                        {isTaskDay ? (
-                          <button
-                            onClick={() => !selectedMemberId && toggleTask(task.id, d)}
+                      <td key={d} className={`text-center py-3 px-1 align-top ${isOff ? 'opacity-25' : ''}`}>
+                        {isTaskDay && !isOff ? (
+                          <select
+                            value={mins}
+                            onChange={e => setTaskTime(task.id, d, parseInt(e.target.value))}
                             disabled={!!selectedMemberId}
-                            className={`w-6 h-6 rounded border-2 flex items-center justify-center mx-auto transition-colors ${done ? 'bg-green-500 border-green-500' : d === today ? 'border-blue-500 hover:border-green-400' : 'border-gray-600 hover:border-green-400'} ${selectedMemberId ? 'cursor-default' : ''}`}
+                            className={`text-xs rounded px-1 py-0.5 border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer w-14 ${timeBadgeClass(mins)} ${selectedMemberId ? 'cursor-default' : ''}`}
                           >
-                            {done && <span className="text-white text-xs">✓</span>}
-                          </button>
+                            {TIME_OPTIONS.map(t => (
+                              <option key={t} value={t} className="bg-gray-900 text-white">{formatTime(t)}</option>
+                            ))}
+                          </select>
                         ) : (
-                          <span className="text-gray-700">—</span>
+                          <span className="text-gray-700 text-xs">—</span>
                         )}
                       </td>
                     )
@@ -323,12 +446,13 @@ export default function TasksPage() {
             <div className="space-y-2">
               {eowTasks.map(task => {
                 const key = `${task.id}-Fri`
-                const done = completions[key] ?? false
+                const done = (completions[key] ?? 0) > 0
                 return (
                   <div key={task.id} className={`flex items-start gap-3 p-4 rounded-xl border ${done ? 'bg-green-900/20 border-green-800/50' : 'bg-gray-900 border-gray-800'}`}>
                     <button
-                      onClick={() => toggleTask(task.id, 'Fri')}
-                      className={`mt-0.5 w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center cursor-pointer transition-colors ${done ? 'bg-green-500 border-green-500' : 'border-gray-600 hover:border-green-400'}`}
+                      onClick={() => toggleEOWTask(task.id, 'Fri')}
+                      disabled={!!selectedMemberId}
+                      className={`mt-0.5 w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center cursor-pointer transition-colors ${done ? 'bg-green-500 border-green-500' : 'border-gray-600 hover:border-green-400'} ${selectedMemberId ? 'cursor-default' : ''}`}
                     >
                       {done && <span className="text-white text-xs">✓</span>}
                     </button>
@@ -354,12 +478,14 @@ export default function TasksPage() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-gray-300">My Custom Tasks</h3>
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors"
-            >
-              + Add Task
-            </button>
+            {!selectedMemberId && (
+              <button
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+              >
+                + Add Task
+              </button>
+            )}
           </div>
 
           {showAddForm && (
@@ -408,7 +534,7 @@ export default function TasksPage() {
           )}
 
           {customTasks.length === 0 && !showAddForm && (
-            <p className="text-sm text-gray-500 py-4">No custom tasks yet. Click "+ Add Task" to create one.</p>
+            <p className="text-sm text-gray-500 py-4">No custom tasks yet. Click &quot;+ Add Task&quot; to create one.</p>
           )}
 
           {customTasks.length > 0 && (
@@ -417,9 +543,9 @@ export default function TasksPage() {
                 <thead>
                   <tr className="border-b border-gray-800">
                     <th className="text-left py-2 pr-4 text-gray-400 font-medium">Task</th>
-                    <th className="text-left py-2 pr-4 text-gray-400 font-medium hidden md:table-cell">Time</th>
+                    <th className="text-left py-2 pr-4 text-gray-400 font-medium hidden md:table-cell">Est.</th>
                     {DAYS.map(d => (
-                      <th key={d} className={`text-center py-2 px-2 font-medium w-10 ${d === today ? 'text-blue-400' : 'text-gray-400'}`}>{d}</th>
+                      <th key={d} className={`text-center py-2 px-1 font-medium w-12 ${d === today ? 'text-blue-400' : 'text-gray-400'}`}>{d}</th>
                     ))}
                     <th className="w-8"></th>
                   </tr>
@@ -432,28 +558,35 @@ export default function TasksPage() {
                         {task.description && <p className="text-xs text-gray-400">{task.description}</p>}
                         <LinkSection taskId={task.id + 10000} />
                       </td>
-                      <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top">{task.time_window}</td>
+                      <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
                       {DAYS.map(d => {
                         const isTaskDay = task.days.includes(d)
+                        const isOff = dayOffs[d] === 'off'
                         const key = `custom-${task.id}-${d}`
-                        const done = completions[key] ?? false
+                        const mins = completions[key] ?? 0
                         return (
-                          <td key={d} className="text-center py-3 px-2 align-top">
-                            {isTaskDay ? (
-                              <button
-                                onClick={() => setCompletions(prev => ({ ...prev, [key]: !done }))}
-                                className={`w-6 h-6 rounded border-2 flex items-center justify-center mx-auto transition-colors ${done ? 'bg-green-500 border-green-500' : d === today ? 'border-blue-500 hover:border-green-400' : 'border-gray-600 hover:border-green-400'}`}
+                          <td key={d} className={`text-center py-3 px-1 align-top ${isOff ? 'opacity-25' : ''}`}>
+                            {isTaskDay && !isOff ? (
+                              <select
+                                value={mins}
+                                onChange={e => setTaskTime(task.id + 10000, d, parseInt(e.target.value))}
+                                disabled={!!selectedMemberId}
+                                className={`text-xs rounded px-1 py-0.5 border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer w-14 ${timeBadgeClass(mins)} ${selectedMemberId ? 'cursor-default' : ''}`}
                               >
-                                {done && <span className="text-white text-xs">✓</span>}
-                              </button>
+                                {TIME_OPTIONS.map(t => (
+                                  <option key={t} value={t} className="bg-gray-900 text-white">{formatTime(t)}</option>
+                                ))}
+                              </select>
                             ) : (
-                              <span className="text-gray-700">—</span>
+                              <span className="text-gray-700 text-xs">—</span>
                             )}
                           </td>
                         )
                       })}
                       <td className="py-3 align-top">
-                        <button onClick={() => deleteCustomTask(task.id)} className="text-gray-600 hover:text-red-400 text-xs transition-colors">✕</button>
+                        {!selectedMemberId && (
+                          <button onClick={() => deleteCustomTask(task.id)} className="text-gray-600 hover:text-red-400 text-xs transition-colors">✕</button>
+                        )}
                       </td>
                     </tr>
                   ))}
