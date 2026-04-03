@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
@@ -7,10 +8,16 @@ export default async function AdminPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const adminDb = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
+  const { data: profile } = await adminDb.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') redirect('/dashboard')
 
-  const { data: members } = await supabase
+  const { data: members } = await adminDb
     .from('profiles')
     .select('*')
     .eq('role', 'member')
