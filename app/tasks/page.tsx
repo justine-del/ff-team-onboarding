@@ -31,6 +31,64 @@ function timeBadgeClass(mins: number): string {
   return 'bg-purple-900/40 border-purple-700/50 text-purple-300'
 }
 
+function buildReportHtml(reportText: string, memberName: string, weekOf: string): string {
+  const lines = reportText.split('\n')
+  let body = ''
+  let inList = false
+  let inTable = false
+  let firstRow = true
+
+  for (const line of lines) {
+    const t = line.trim()
+    if (!t) {
+      if (inList) { body += '</ul>'; inList = false }
+      if (inTable) { body += '</tbody></table>'; inTable = false; firstRow = true }
+      body += '<br>'; continue
+    }
+    if (t.startsWith('|') && t.endsWith('|')) {
+      if (/^\|[\s\-|]+\|$/.test(t)) continue
+      const cells = t.slice(1, -1).split('|').map(c => c.trim())
+      if (firstRow) {
+        if (inList) { body += '</ul>'; inList = false }
+        body += '<table><thead><tr>' + cells.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>'
+        inTable = true; firstRow = false; continue
+      }
+      body += '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>'; continue
+    }
+    if (inTable) { body += '</tbody></table>'; inTable = false; firstRow = true }
+    const bold = (s: string) => s.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    const hm = t.match(/^\*\*(.*?)\*\*$/)
+    if (hm) {
+      if (inList) { body += '</ul>'; inList = false }
+      body += hm[1].toLowerCase().includes('eow') ? `<h1>${bold(hm[1])}</h1>` : `<h2>${bold(hm[1])}</h2>`
+      continue
+    }
+    if (t.startsWith('- ') || t.startsWith('• ')) {
+      if (!inList) { body += '<ul>'; inList = true }
+      body += `<li>${bold(t.slice(2))}</li>`; continue
+    }
+    if (inList) { body += '</ul>'; inList = false }
+    body += `<p>${bold(t)}</p>`
+  }
+  if (inList) body += '</ul>'
+  if (inTable) body += '</tbody></table>'
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>EOW Report — ${memberName}</title><style>
+    body{font-family:Arial,sans-serif;max-width:820px;margin:40px auto;color:#111;line-height:1.6;padding:0 20px}
+    h1{font-size:20px;border-bottom:3px solid #1a1a2e;padding-bottom:8px;color:#1a1a2e}
+    h2{font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:#1a1a2e;margin-top:28px}
+    table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}
+    th{background:#1a1a2e;color:#fff;padding:8px 12px;text-align:left}
+    td{padding:7px 12px;border-bottom:1px solid #e0e0e0}
+    tr:nth-child(even) td{background:#f9f9f9}
+    ul{padding-left:20px}li{margin:4px 0;font-size:13px}
+    p{margin:5px 0;font-size:13px}
+    footer{margin-top:40px;border-top:1px solid #ddd;padding-top:8px;font-size:11px;color:#aaa}
+  </style></head><body>${body}
+  <footer>Generated via Cyborg VA Portal · ${memberName} · ${weekOf}</footer>
+  </body></html>`
+}
+
 type CustomTask = {
   id: number
   task_name: string
@@ -80,8 +138,6 @@ export default function TasksPage() {
   const [reportText, setReportText] = useState('')
   const [generatingReport, setGeneratingReport] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [docUrl, setDocUrl] = useState<string | null>(null)
-  const [creatingDoc, setCreatingDoc] = useState(false)
   const [reportMeta, setReportMeta] = useState<{ name: string; weekOf: string }>({ name: '', weekOf: '' })
 
   const monday = getMonday()
@@ -231,7 +287,6 @@ export default function TasksPage() {
     setGeneratingReport(true)
     setShowReport(true)
     setReportText('')
-    setDocUrl(null)
 
     const allTasks = [
       ...DEFAULT_TASKS.filter(t => !t.is_eow).map(t => ({
@@ -692,36 +747,21 @@ export default function TasksPage() {
                     >
                       {copied ? 'Copied!' : 'Copy'}
                     </button>
-                    {docUrl ? (
-                      <a
-                        href={docUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm bg-green-700 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg transition-colors"
-                      >
-                        Open Google Doc ↗
-                      </a>
-                    ) : (
-                      <button
-                        onClick={async () => {
-                          setCreatingDoc(true)
-                          try {
-                            const res = await fetch('/api/eow-doc', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ reportText, memberName: reportMeta.name, weekOf: reportMeta.weekOf }),
-                            })
-                            const data = await res.json()
-                            if (data.docUrl) setDocUrl(data.docUrl)
-                          } catch { /* silent */ }
-                          setCreatingDoc(false)
-                        }}
-                        disabled={creatingDoc}
-                        className="text-sm bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors"
-                      >
-                        {creatingDoc ? 'Creating…' : 'Save as Google Doc'}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => {
+                        const html = buildReportHtml(reportText, reportMeta.name, reportMeta.weekOf)
+                        const blob = new Blob([html], { type: 'text/html' })
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = `EOW Report — ${reportMeta.name} — ${reportMeta.weekOf}.html`
+                        a.click()
+                        URL.revokeObjectURL(url)
+                      }}
+                      className="text-sm bg-blue-700 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      Download Doc
+                    </button>
                   </>
                 )}
                 <button
