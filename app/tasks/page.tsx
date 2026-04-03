@@ -139,6 +139,8 @@ export default function TasksPage() {
   const [generatingReport, setGeneratingReport] = useState(false)
   const [copied, setCopied] = useState(false)
   const [reportMeta, setReportMeta] = useState<{ name: string; weekOf: string }>({ name: '', weekOf: '' })
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const toggleSection = (key: string) => setCollapsed(p => ({ ...p, [key]: !p[key] }))
 
   const monday = getMonday()
   const weekStart = monday.toISOString().split('T')[0]
@@ -481,142 +483,114 @@ export default function TasksPage() {
           </div>
         </div>
 
-        {/* Day off legend */}
-        {!selectedMemberId && (
-          <p className="text-xs text-gray-600 mb-3">Click a day header to mark as <span className="text-red-400">OFF</span> → click again for <span className="text-yellow-400">½ day</span> → click again to clear.</p>
-        )}
 
-        {/* Default Tasks Table */}
-        <div className="overflow-x-auto mb-8">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-800">
-                <th className="text-left py-2 pr-4 text-gray-400 font-medium w-8">#</th>
-                <th className="text-left py-2 pr-4 text-gray-400 font-medium">Task</th>
-                <th className="text-left py-2 pr-4 text-gray-400 font-medium hidden md:table-cell">Window</th>
-                <th className="text-left py-2 pr-4 text-gray-400 font-medium hidden md:table-cell">Est.</th>
-                {DAYS.map(d => {
-                  const isOff = dayOffs[d] === 'off'
-                  const isHalf = dayOffs[d] === 'half'
-                  return (
-                    <th key={d} className={`text-center py-1 px-1 font-medium w-12`}>
-                      {!selectedMemberId ? (
-                        <button
-                          onClick={() => toggleDayOff(d)}
-                          title="Click to mark day off / half day"
-                          className={`w-full rounded-lg px-1 py-1.5 transition-colors ${
-                            isOff ? 'bg-red-900/50 text-red-400 hover:bg-red-900/70' :
-                            isHalf ? 'bg-yellow-900/50 text-yellow-400 hover:bg-yellow-900/70' :
-                            d === today ? 'text-blue-400 hover:bg-gray-800' : 'text-gray-400 hover:bg-gray-800'
-                          }`}
-                        >
-                          <div className="font-medium">{d}</div>
-                          <div className="text-[10px] mt-0.5">{isOff ? 'OFF' : isHalf ? '½ day' : ''}</div>
-                        </button>
-                      ) : (
-                        <div className={`text-[10px] mt-0.5 ${isOff ? 'text-red-400' : isHalf ? 'text-yellow-400' : 'text-transparent'}`}>
-                          {isOff ? 'OFF' : isHalf ? '½' : '·'}
+        {/* ── MORNING TASKS ── */}
+        <div className="mb-6">
+          <button onClick={() => toggleSection('morning')} className="w-full flex items-center justify-between px-4 py-2.5 bg-blue-950/40 border border-blue-800/50 rounded-xl mb-3 hover:bg-blue-950/60 transition-colors">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-400 flex-shrink-0"></span>
+              <span className="font-semibold text-blue-300 text-sm">Morning Tasks</span>
+              <span className="text-xs text-blue-400/60">{regularTasks.length} tasks · daily</span>
+            </div>
+            <span className="text-blue-400 text-xs">{collapsed.morning ? '▼ Show' : '▲ Hide'}</span>
+          </button>
+
+          {!collapsed.morning && (
+            <div>
+            {!selectedMemberId && (
+              <p className="text-xs text-gray-500 mb-2 px-1">
+                Taking a day off or half day? Click the day header to mark as <span className="text-red-400 font-medium">OFF</span> → click again for <span className="text-yellow-400 font-medium">½ Day</span> → click again to clear.
+              </p>
+            )}
+            <div className="overflow-x-auto border border-blue-900/40 rounded-xl">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-blue-900/40 bg-blue-950/20">
+                    <th className="text-left py-2 pr-4 pl-4 text-blue-400/70 font-medium w-8">#</th>
+                    <th className="text-left py-2 pr-4 text-blue-400/70 font-medium">Task</th>
+                    <th className="text-left py-2 pr-4 text-blue-400/70 font-medium hidden md:table-cell">Window</th>
+                    <th className="text-left py-2 pr-4 text-blue-400/70 font-medium hidden md:table-cell">Est.</th>
+                    {DAYS.map(d => {
+                      const isOff = dayOffs[d] === 'off'
+                      const isHalf = dayOffs[d] === 'half'
+                      return (
+                        <th key={d} className="text-center py-1 px-1 font-medium w-12">
+                          {!selectedMemberId ? (
+                            <button onClick={() => toggleDayOff(d)} title="Click to mark day off / half day"
+                              className={`w-full rounded-lg px-1 py-1.5 transition-colors ${isOff ? 'bg-red-900/50 text-red-400' : isHalf ? 'bg-yellow-900/50 text-yellow-400' : d === today ? 'text-blue-400 hover:bg-gray-800' : 'text-gray-400 hover:bg-gray-800'}`}>
+                              <div className="font-medium">{d}</div>
+                              <div className="text-[10px] mt-0.5">{isOff ? 'OFF' : isHalf ? '½' : ''}</div>
+                            </button>
+                          ) : (
+                            <div className={`text-[10px] ${isOff ? 'text-red-400' : isHalf ? 'text-yellow-400' : 'text-transparent'}`}>{isOff ? 'OFF' : isHalf ? '½' : '·'}</div>
+                          )}
+                        </th>
+                      )
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {regularTasks.map(task => (
+                    <tr key={task.id} className="border-b border-blue-900/20 last:border-0">
+                      <td className="py-3 pr-4 pl-4 text-blue-400/50 align-top">{task.sop_number}</td>
+                      <td className="py-3 pr-4 align-top">
+                        <p className="font-medium">{task.name}</p>
+                        <p className="text-xs text-gray-400 hidden sm:block">{task.description}</p>
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                          {task.loom_link && <a href={task.loom_link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300">Watch tutorial →</a>}
+                          {task.doc_link && <a href={task.doc_link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">View SOP →</a>}
+                          {task.form_link && <a href={task.form_link} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:text-green-300">Submit form →</a>}
                         </div>
-                      )}
-                    </th>
-                  )
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {regularTasks.map(task => (
-                <tr key={task.id} className="border-b border-gray-800/50">
-                  <td className="py-3 pr-4 text-gray-500 align-top">{task.sop_number}</td>
-                  <td className="py-3 pr-4 align-top">
-                    <p className="font-medium">{task.name}</p>
-                    <p className="text-xs text-gray-400 hidden sm:block">{task.description}</p>
-                    <div className="flex items-center gap-3 mt-1 flex-wrap">
-                      {task.loom_link && <a href={task.loom_link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300">Watch tutorial →</a>}
-                      {task.doc_link && <a href={task.doc_link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">View SOP →</a>}
-                      {task.form_link && <a href={task.form_link} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:text-green-300">Submit form →</a>}
-                    </div>
-                    <LinkSection taskId={task.id} />
-                  </td>
-                  <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.time_window}</td>
-                  <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
-                  {DAYS.map(d => {
-                    const isTaskDay = task.days.includes(d)
-                    const isOff = dayOffs[d] === 'off'
-                    const key = `${task.id}-${d}`
-                    const mins = completions[key] ?? 0
-                    return (
-                      <td key={d} className={`text-center py-3 px-1 align-top ${isOff ? 'opacity-25' : ''}`}>
-                        {isTaskDay && !isOff ? (
-                          <select
-                            value={mins}
-                            onChange={e => setTaskTime(task.id, d, parseInt(e.target.value))}
-                            disabled={!!selectedMemberId}
-                            className={`text-xs rounded px-1 py-0.5 border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer w-14 ${timeBadgeClass(mins)} ${selectedMemberId ? 'cursor-default' : ''}`}
-                          >
-                            {TIME_OPTIONS.map(t => (
-                              <option key={t} value={t} className="bg-gray-900 text-white">{formatTime(t)}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="text-gray-700 text-xs">—</span>
-                        )}
+                        <LinkSection taskId={task.id} />
                       </td>
-                    )
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.time_window}</td>
+                      <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
+                      {DAYS.map(d => {
+                        const isTaskDay = task.days.includes(d)
+                        const isOff = dayOffs[d] === 'off'
+                        const key = `${task.id}-${d}`
+                        const mins = completions[key] ?? 0
+                        return (
+                          <td key={d} className={`text-center py-3 px-1 align-top ${isOff ? 'opacity-25' : ''}`}>
+                            {isTaskDay && !isOff ? (
+                              <select value={mins} onChange={e => setTaskTime(task.id, d, parseInt(e.target.value))} disabled={!!selectedMemberId}
+                                className={`text-xs rounded px-1 py-0.5 border focus:outline-none w-14 ${timeBadgeClass(mins)}`}>
+                                {TIME_OPTIONS.map(t => <option key={t} value={t} className="bg-gray-900 text-white">{formatTime(t)}</option>)}
+                              </select>
+                            ) : <span className="text-gray-700 text-xs">—</span>}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            </div>
+          )}
         </div>
 
-        {/* EOW Tasks */}
-        {isFriday && (
-          <div className="mb-8">
-            <h3 className="font-semibold text-gray-300 mb-3">End of Week Tasks (Friday)</h3>
-            <div className="space-y-2">
-              {eowTasks.map(task => {
-                const key = `${task.id}-Fri`
-                const done = (completions[key] ?? 0) > 0
-                return (
-                  <div key={task.id} className={`flex items-start gap-3 p-4 rounded-xl border ${done ? 'bg-green-900/20 border-green-800/50' : 'bg-gray-900 border-gray-800'}`}>
-                    <button
-                      onClick={() => toggleEOWTask(task.id, 'Fri')}
-                      disabled={!!selectedMemberId}
-                      className={`mt-0.5 w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center cursor-pointer transition-colors ${done ? 'bg-green-500 border-green-500' : 'border-gray-600 hover:border-green-400'} ${selectedMemberId ? 'cursor-default' : ''}`}
-                    >
-                      {done && <span className="text-white text-xs">✓</span>}
-                    </button>
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{task.name}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{task.time_window} · {task.est_time}</p>
-                      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                        {task.loom_link && <a href={task.loom_link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300">Watch tutorial →</a>}
-                        {task.doc_link && <a href={task.doc_link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">View SOP →</a>}
-                        {task.form_link && <a href={task.form_link} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:text-green-300">Submit form →</a>}
-                      </div>
-                      <LinkSection taskId={task.id} />
-                    </div>
-                  </div>
-                )
-              })}
+        {/* ── CUSTOM TASKS ── */}
+        <div className="mb-6">
+          <button onClick={() => toggleSection('custom')} className="w-full flex items-center justify-between px-4 py-2.5 bg-teal-950/40 border border-teal-800/50 rounded-xl mb-3 hover:bg-teal-950/60 transition-colors">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-teal-400 flex-shrink-0"></span>
+              <span className="font-semibold text-teal-300 text-sm">My Custom Tasks</span>
+              <span className="text-xs text-teal-400/60">{customTasks.length} tasks</span>
             </div>
-          </div>
-        )}
+            <div className="flex items-center gap-2">
+              {!selectedMemberId && (
+                <button onClick={e => { e.stopPropagation(); setShowAddForm(!showAddForm) }}
+                  className="text-xs bg-teal-800/60 hover:bg-teal-700/60 text-teal-300 px-2.5 py-1 rounded-lg transition-colors">
+                  + Add
+                </button>
+              )}
+              <span className="text-teal-400 text-xs">{collapsed.custom ? '▼ Show' : '▲ Hide'}</span>
+            </div>
+          </button>
 
-        {/* Custom Tasks Section */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-gray-300">My Custom Tasks</h3>
-            {!selectedMemberId && (
-              <button
-                onClick={() => setShowAddForm(!showAddForm)}
-                className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors"
-              >
-                + Add Task
-              </button>
-            )}
-          </div>
+          {!collapsed.custom && (
+            <div>
 
           {showAddForm && (
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-4">
@@ -724,7 +698,89 @@ export default function TasksPage() {
               </table>
             </div>
           )}
+          </div>
+          )}
         </div>
+
+        {/* ── EOW TASKS ── */}
+        <div className="mb-6">
+          <button onClick={() => toggleSection('eow')} className="w-full flex items-center justify-between px-4 py-2.5 bg-purple-950/40 border border-purple-800/50 rounded-xl mb-3 hover:bg-purple-950/60 transition-colors">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-400 flex-shrink-0"></span>
+              <span className="font-semibold text-purple-300 text-sm">End of Week Tasks</span>
+              <span className="text-xs text-purple-400/60">{eowTasks.length} tasks · Fridays</span>
+            </div>
+            <span className="text-purple-400 text-xs">{collapsed.eow ? '▼ Show' : '▲ Hide'}</span>
+          </button>
+
+          {!collapsed.eow && (
+            <div className="overflow-x-auto border border-purple-900/40 rounded-xl">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-purple-900/40 bg-purple-950/20">
+                    <th className="text-left py-2 pr-4 pl-4 text-purple-400/70 font-medium w-8">#</th>
+                    <th className="text-left py-2 pr-4 text-purple-400/70 font-medium">Task</th>
+                    <th className="text-left py-2 pr-4 text-purple-400/70 font-medium hidden md:table-cell">Window</th>
+                    <th className="text-left py-2 pr-4 text-purple-400/70 font-medium hidden md:table-cell">Est.</th>
+                    {DAYS.map(d => (
+                      <th key={d} className={`text-center py-2 px-1 font-medium w-12 ${d === 'Fri' ? 'text-purple-400' : 'text-gray-600'}`}>{d}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {eowTasks.map(task => (
+                    <tr key={task.id} className="border-b border-purple-900/20 last:border-0">
+                      <td className="py-3 pr-4 pl-4 text-purple-400/50 align-top">{task.sop_number}</td>
+                      <td className="py-3 pr-4 align-top">
+                        <p className="font-medium">{task.name}</p>
+                        <p className="text-xs text-gray-400 hidden sm:block">{task.description}</p>
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                          {task.loom_link && <a href={task.loom_link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300">Watch tutorial →</a>}
+                          {task.doc_link && <a href={task.doc_link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">View SOP →</a>}
+                          {task.form_link && <a href={task.form_link} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:text-green-300">Submit form →</a>}
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.time_window}</td>
+                      <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
+                      {DAYS.map(d => {
+                        const isTaskDay = task.days.includes(d)
+                        const isOff = dayOffs[d] === 'off'
+                        const key = `${task.id}-${d}`
+                        const checked = (completions[key] ?? 0) > 0
+                        return (
+                          <td key={d} className={`text-center py-3 px-1 align-top ${isOff ? 'opacity-25' : ''}`}>
+                            {isTaskDay && !isOff ? (
+                              <button
+                                onClick={() => toggleEOWTask(task.id, d)}
+                                disabled={!!selectedMemberId}
+                                className={`w-6 h-6 rounded border-2 transition-colors ${checked ? 'bg-purple-600 border-purple-500' : 'border-gray-600 hover:border-purple-500'}`}
+                              >
+                                {checked && <span className="text-white text-xs">✓</span>}
+                              </button>
+                            ) : <span className="text-gray-700 text-xs">—</span>}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* EOW Report Button */}
+        {isFriday && (
+          <div className="bg-purple-950/30 border border-purple-800/40 rounded-xl p-4 mb-6 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-purple-300">It&apos;s Friday!</p>
+              <p className="text-xs text-purple-400/70">Generate your end-of-week performance report.</p>
+            </div>
+            <button onClick={generateReport} className="text-sm bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors">
+              Generate Report
+            </button>
+          </div>
+        )}
       </main>
     </div>
 
