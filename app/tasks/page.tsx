@@ -138,7 +138,6 @@ export default function TasksPage() {
   const [reportText, setReportText] = useState('')
   const [generatingReport, setGeneratingReport] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [savingDoc, setSavingDoc] = useState(false)
   const [reportMeta, setReportMeta] = useState<{ name: string; weekOf: string }>({ name: '', weekOf: '' })
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const toggleSection = (key: string) => setCollapsed(p => ({ ...p, [key]: !p[key] }))
@@ -804,28 +803,6 @@ export default function TasksPage() {
                     >
                       {copied ? 'Copied!' : 'Copy'}
                     </button>
-                    <button
-                      onClick={async () => {
-                        setSavingDoc(true)
-                        try {
-                          const res = await fetch('/api/eow-doc', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ reportText, memberName: reportMeta.name, weekOf: reportMeta.weekOf }),
-                          })
-                          const data = await res.json()
-                          if (data.docUrl) window.open(data.docUrl, '_blank')
-                          else alert('Failed to create Google Doc: ' + (data.error ?? 'Unknown error'))
-                        } catch {
-                          alert('Failed to create Google Doc.')
-                        }
-                        setSavingDoc(false)
-                      }}
-                      disabled={savingDoc}
-                      className="text-sm bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors"
-                    >
-                      {savingDoc ? 'Creating...' : 'Save as Google Doc'}
-                    </button>
                   </>
                 )}
                 <button
@@ -841,7 +818,38 @@ export default function TasksPage() {
                   <span>Generating report...</span>
                 </div>
               ) : (
-                <pre className="text-sm text-gray-200 whitespace-pre-wrap font-sans leading-relaxed">{reportText}</pre>
+                <div className="text-sm text-gray-200 leading-relaxed select-all">
+                  {reportText.split('\n').map((line, i) => {
+                    const t = line.trim()
+                    if (!t) return <br key={i} />
+                    const bold = (s: string) => s.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    const headerMatch = t.match(/^\*\*(.*?)\*\*$/)
+                    if (headerMatch) {
+                      const text = headerMatch[1]
+                      return text.toLowerCase().includes('eow performance') || text.toLowerCase().includes('week of')
+                        ? <h2 key={i} className="text-base font-bold text-white mt-4 mb-1 border-b border-gray-700 pb-1" dangerouslySetInnerHTML={{ __html: bold(text) }} />
+                        : <h3 key={i} className="text-sm font-bold text-purple-300 uppercase tracking-wide mt-4 mb-1" dangerouslySetInnerHTML={{ __html: bold(text) }} />
+                    }
+                    if (t.startsWith('|') && t.endsWith('|')) {
+                      if (/^\|[\s\-|]+\|$/.test(t)) return null
+                      const cells = t.slice(1, -1).split('|').map(c => c.trim())
+                      return (
+                        <div key={i} className="grid gap-px mb-px" style={{ gridTemplateColumns: `repeat(${cells.length}, 1fr)` }}>
+                          {cells.map((c, j) => (
+                            <span key={j} className="bg-gray-800 px-2 py-1 text-xs text-gray-200 border border-gray-700">{c}</span>
+                          ))}
+                        </div>
+                      )
+                    }
+                    if (t.startsWith('- ') || t.startsWith('• ')) {
+                      return <p key={i} className="ml-4 before:content-['•'] before:mr-2 before:text-purple-400" dangerouslySetInnerHTML={{ __html: bold(t.slice(2)) }} />
+                    }
+                    if (t.startsWith('  - ')) {
+                      return <p key={i} className="ml-8 text-gray-400 before:content-['–'] before:mr-2" dangerouslySetInnerHTML={{ __html: bold(t.slice(4)) }} />
+                    }
+                    return <p key={i} className="mb-1" dangerouslySetInnerHTML={{ __html: bold(t) }} />
+                  })}
+                </div>
               )}
             </div>
           </div>
