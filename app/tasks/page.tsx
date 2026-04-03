@@ -41,6 +41,8 @@ function getMonday() {
   return monday
 }
 
+type Member = { id: string; first_name: string; last_name: string; email: string }
+
 export default function TasksPage() {
   const [completions, setCompletions] = useState<Record<string, boolean>>({})
   const [vaLinks, setVALinks] = useState<Record<number, VALink>>({})
@@ -51,11 +53,16 @@ export default function TasksPage() {
   const [savingLink, setSavingLink] = useState<number | null>(null)
   const [linkDraft, setLinkDraft] = useState<Record<number, { loom: string, sop: string }>>({})
   const [userId, setUserId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [members, setMembers] = useState<Member[]>([])
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const monday = getMonday()
   const weekStart = monday.toISOString().split('T')[0]
   const today = new Date().toLocaleDateString('en-US', { weekday: 'short' })
+
+  const viewingId = selectedMemberId ?? userId
 
   useEffect(() => {
     async function load() {
@@ -64,10 +71,28 @@ export default function TasksPage() {
       if (!user) return
       setUserId(user.id)
 
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      const admin = profile?.role === 'admin'
+      setIsAdmin(admin)
+
+      if (admin) {
+        const { data: allMembers } = await supabase.from('profiles').select('id, first_name, last_name, email').eq('role', 'member').order('first_name')
+        setMembers(allMembers ?? [])
+      }
+
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  useEffect(() => {
+    if (!viewingId) return
+    async function loadData() {
+      const supabase = createClient()
       const [completionData, linkData, customData] = await Promise.all([
-        supabase.from('task_completions').select('task_id, day, completed').eq('user_id', user.id).eq('week_start', weekStart),
-        supabase.from('va_task_links').select('task_id, loom_link, sop_doc_link').eq('user_id', user.id),
-        supabase.from('va_custom_tasks').select('*').eq('user_id', user.id).eq('active', true),
+        supabase.from('task_completions').select('task_id, day, completed').eq('user_id', viewingId).eq('week_start', weekStart),
+        supabase.from('va_task_links').select('task_id, loom_link, sop_doc_link').eq('user_id', viewingId),
+        supabase.from('va_custom_tasks').select('*').eq('user_id', viewingId).eq('active', true),
       ])
 
       const map: Record<string, boolean> = {}
@@ -83,10 +108,9 @@ export default function TasksPage() {
       setLinkDraft(drafts)
 
       setCustomTasks(customData.data ?? [])
-      setLoading(false)
     }
-    load()
-  }, [weekStart])
+    loadData()
+  }, [viewingId, weekStart])
 
   async function toggleTask(taskId: number, day: string) {
     if (!userId) return
@@ -188,6 +212,30 @@ export default function TasksPage() {
       </nav>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
+        {/* Admin member selector */}
+        {isAdmin && (
+          <div className="bg-blue-950/40 border border-blue-800/50 rounded-xl p-4 mb-6">
+            <p className="text-xs text-blue-300 font-semibold mb-2 uppercase tracking-wide">Admin — View Member Task Sheet</p>
+            {members.length === 0 ? (
+              <p className="text-sm text-gray-400">No members yet.</p>
+            ) : (
+              <div className="flex items-center gap-3">
+                <select
+                  value={selectedMemberId ?? ''}
+                  onChange={e => setSelectedMemberId(e.target.value || null)}
+                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">— Select a member to view their sheet —</option>
+                  {members.map(m => (
+                    <option key={m.id} value={m.id}>{m.first_name} {m.last_name} ({m.email})</option>
+                  ))}
+                </select>
+                {selectedMemberId && <span className="text-xs text-yellow-400 flex-shrink-0">Read-only view</span>}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Core 4 Banner */}
         <div className="bg-blue-900/30 border border-blue-700/50 rounded-xl p-4 mb-6">
           <h3 className="font-semibold text-blue-300 mb-2">The Core 4 Rules</h3>
@@ -250,8 +298,9 @@ export default function TasksPage() {
                       <td key={d} className="text-center py-3 px-2 align-top">
                         {isTaskDay ? (
                           <button
-                            onClick={() => toggleTask(task.id, d)}
-                            className={`w-6 h-6 rounded border-2 flex items-center justify-center mx-auto transition-colors ${done ? 'bg-green-500 border-green-500' : d === today ? 'border-blue-500 hover:border-green-400' : 'border-gray-600 hover:border-green-400'}`}
+                            onClick={() => !selectedMemberId && toggleTask(task.id, d)}
+                            disabled={!!selectedMemberId}
+                            className={`w-6 h-6 rounded border-2 flex items-center justify-center mx-auto transition-colors ${done ? 'bg-green-500 border-green-500' : d === today ? 'border-blue-500 hover:border-green-400' : 'border-gray-600 hover:border-green-400'} ${selectedMemberId ? 'cursor-default' : ''}`}
                           >
                             {done && <span className="text-white text-xs">✓</span>}
                           </button>
