@@ -71,10 +71,15 @@ export default function TasksPage() {
   const [savingLink, setSavingLink] = useState<number | null>(null)
   const [linkDraft, setLinkDraft] = useState<Record<number, { loom: string, sop: string }>>({})
   const [userId, setUserId] = useState<string | null>(null)
+  const [memberName, setMemberName] = useState<string>('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [members, setMembers] = useState<Member[]>([])
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showReport, setShowReport] = useState(false)
+  const [reportText, setReportText] = useState('')
+  const [generatingReport, setGeneratingReport] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const monday = getMonday()
   const weekStart = monday.toISOString().split('T')[0]
@@ -93,9 +98,10 @@ export default function TasksPage() {
       if (!user) return
       setUserId(user.id)
 
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      const { data: profile } = await supabase.from('profiles').select('role, first_name, last_name').eq('id', user.id).single()
       const admin = profile?.role === 'admin'
       setIsAdmin(admin)
+      setMemberName(`${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim())
 
       if (admin) {
         const { data: allMembers } = await supabase.from('profiles').select('id, first_name, last_name, email').eq('role', 'member').order('first_name')
@@ -218,6 +224,50 @@ export default function TasksPage() {
     setCustomTasks(prev => prev.filter(t => t.id !== id))
   }
 
+  async function generateReport() {
+    setGeneratingReport(true)
+    setShowReport(true)
+    setReportText('')
+
+    const allTasks = [
+      ...DEFAULT_TASKS.filter(t => !t.is_eow).map(t => ({
+        name: t.name,
+        days: t.days,
+        loggedDays: Object.fromEntries(t.days.map(d => [d, completions[`${t.id}-${d}`] ?? 0])),
+        totalMins: t.days.reduce((sum, d) => sum + (completions[`${t.id}-${d}`] ?? 0), 0),
+      })),
+      ...customTasks.map(t => ({
+        name: t.task_name,
+        days: t.days,
+        loggedDays: Object.fromEntries(t.days.map(d => [d, completions[`custom-${t.id}-${d}`] ?? 0])),
+        totalMins: t.days.reduce((sum, d) => sum + (completions[`custom-${t.id}-${d}`] ?? 0), 0),
+      })),
+    ]
+
+    const name = selectedMemberId
+      ? members.find(m => m.id === selectedMemberId)?.first_name + ' ' + members.find(m => m.id === selectedMemberId)?.last_name
+      : memberName
+
+    try {
+      const res = await fetch('/api/eow-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          memberName: name.trim() || 'Team Member',
+          weekOf: monday.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+          tasks: allTasks,
+          weeklyHours,
+          dayOffs,
+        }),
+      })
+      const data = await res.json()
+      setReportText(data.report ?? data.error ?? 'Error generating report.')
+    } catch {
+      setReportText('Error generating report. Check your API key in Vercel.')
+    }
+    setGeneratingReport(false)
+  }
+
   const isFriday = today === 'Fri'
   const regularTasks = DEFAULT_TASKS.filter(t => !t.is_eow)
   const eowTasks = DEFAULT_TASKS.filter(t => t.is_eow)
@@ -276,9 +326,17 @@ export default function TasksPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <nav className="border-b border-gray-800 px-6 py-4 flex items-center gap-4">
-        <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">← Dashboard</Link>
-        <h1 className="text-lg font-bold">My Task Sheet</h1>
+      <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">← Dashboard</Link>
+          <h1 className="text-lg font-bold">My Task Sheet</h1>
+        </div>
+        <button
+          onClick={generateReport}
+          className="text-sm bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors"
+        >
+          Generate EOW Report
+        </button>
       </nav>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
@@ -596,6 +654,46 @@ export default function TasksPage() {
           )}
         </div>
       </main>
+    </div>
+
+      {/* EOW Report Modal */}
+      {showReport && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+              <h2 className="font-semibold text-lg">EOW Performance Report</h2>
+              <div className="flex items-center gap-2">
+                {reportText && (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(reportText)
+                      setCopied(true)
+                      setTimeout(() => setCopied(false), 2000)
+                    }}
+                    className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowReport(false)}
+                  className="text-gray-400 hover:text-white text-lg px-2"
+                >✕</button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {generatingReport ? (
+                <div className="flex items-center gap-3 text-gray-400 py-8 justify-center">
+                  <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Generating report...</span>
+                </div>
+              ) : (
+                <pre className="text-sm text-gray-200 whitespace-pre-wrap font-sans leading-relaxed">{reportText}</pre>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
