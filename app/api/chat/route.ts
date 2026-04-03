@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
 
     // Optionally append live Google Drive SOP content
     const driveContext = await getDriveContext()
+    console.log('[chat] drive context loaded:', driveContext ? `${driveContext.length} chars` : 'null (using built-in)')
     const system = driveContext
       ? `${SYSTEM_PROMPT}\n\n## Live SOP Documents (from Google Drive)\n\n${driveContext}`
       : SYSTEM_PROMPT
