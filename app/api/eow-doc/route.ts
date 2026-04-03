@@ -107,6 +107,24 @@ async function getToken(): Promise<string | null> {
   }
 }
 
+async function deleteOldReports(memberName: string, folderId: string, token: string) {
+  try {
+    const q = encodeURIComponent(`name contains 'EOW Report — ${memberName}' and '${folderId}' in parents and trashed=false`)
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const data = await res.json()
+    for (const file of data.files ?? []) {
+      await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?supportsAllDrives=true`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    }
+  } catch {
+    // non-fatal
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { reportText, memberName, weekOf } = await req.json()
@@ -119,6 +137,9 @@ export async function POST(req: NextRequest) {
     const html = reportToHtml(reportText, memberName, weekOf)
     const fileName = `EOW Report — ${memberName} — ${weekOf}`
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID
+
+    // Delete old reports for this member to free up quota
+    if (folderId) await deleteOldReports(memberName, folderId, token)
 
     const boundary = `boundary_${Date.now()}`
     const metadata = JSON.stringify({
@@ -140,7 +161,7 @@ export async function POST(req: NextRequest) {
     ].join('\r\n')
 
     const uploadRes = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true',
       {
         method: 'POST',
         headers: {
@@ -160,7 +181,7 @@ export async function POST(req: NextRequest) {
     const fileId = uploadData.id
 
     // Make it accessible to anyone with the link
-    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions?supportsAllDrives=true`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ role: 'writer', type: 'anyone' }),
