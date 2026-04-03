@@ -80,6 +80,9 @@ export default function TasksPage() {
   const [reportText, setReportText] = useState('')
   const [generatingReport, setGeneratingReport] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [docUrl, setDocUrl] = useState<string | null>(null)
+  const [creatingDoc, setCreatingDoc] = useState(false)
+  const [reportMeta, setReportMeta] = useState<{ name: string; weekOf: string }>({ name: '', weekOf: '' })
 
   const monday = getMonday()
   const weekStart = monday.toISOString().split('T')[0]
@@ -228,6 +231,7 @@ export default function TasksPage() {
     setGeneratingReport(true)
     setShowReport(true)
     setReportText('')
+    setDocUrl(null)
 
     const allTasks = [
       ...DEFAULT_TASKS.filter(t => !t.is_eow).map(t => ({
@@ -248,13 +252,17 @@ export default function TasksPage() {
       ? members.find(m => m.id === selectedMemberId)?.first_name + ' ' + members.find(m => m.id === selectedMemberId)?.last_name
       : memberName
 
+    const weekOf = monday.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    const resolvedName = name.trim() || 'Team Member'
+    setReportMeta({ name: resolvedName, weekOf })
+
     try {
       const res = await fetch('/api/eow-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          memberName: name.trim() || 'Team Member',
-          weekOf: monday.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+          memberName: resolvedName,
+          weekOf,
           tasks: allTasks,
           weeklyHours,
           dayOffs,
@@ -672,17 +680,49 @@ export default function TasksPage() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
               <h2 className="font-semibold text-lg">EOW Performance Report</h2>
               <div className="flex items-center gap-2">
-                {reportText && (
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(reportText)
-                      setCopied(true)
-                      setTimeout(() => setCopied(false), 2000)
-                    }}
-                    className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors"
-                  >
-                    {copied ? 'Copied!' : 'Copy'}
-                  </button>
+                {reportText && !generatingReport && (
+                  <>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(reportText)
+                        setCopied(true)
+                        setTimeout(() => setCopied(false), 2000)
+                      }}
+                      className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      {copied ? 'Copied!' : 'Copy'}
+                    </button>
+                    {docUrl ? (
+                      <a
+                        href={docUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm bg-green-700 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        Open Google Doc ↗
+                      </a>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          setCreatingDoc(true)
+                          try {
+                            const res = await fetch('/api/eow-doc', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ reportText, memberName: reportMeta.name, weekOf: reportMeta.weekOf }),
+                            })
+                            const data = await res.json()
+                            if (data.docUrl) setDocUrl(data.docUrl)
+                          } catch { /* silent */ }
+                          setCreatingDoc(false)
+                        }}
+                        disabled={creatingDoc}
+                        className="text-sm bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        {creatingDoc ? 'Creating…' : 'Save as Google Doc'}
+                      </button>
+                    )}
+                  </>
                 )}
                 <button
                   onClick={() => setShowReport(false)}
