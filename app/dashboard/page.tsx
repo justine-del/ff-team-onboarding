@@ -180,27 +180,17 @@ export default async function DashboardPage() {
             </div>
           )}
 
-          {/* Task Sheet — unlocked after Phase 1 complete */}
-          {phase1Complete ? (
-            <Link
-              href="/tasks"
-              className="bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-gray-600 transition-colors"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-2xl">✅</span>
-                <h3 className="font-semibold">My Task Sheet</h3>
-              </div>
-              <div className="text-sm text-gray-400">{tasks.data?.length ?? 0} tasks checked off this week</div>
-            </Link>
-          ) : (
-            <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-5 opacity-60 cursor-not-allowed">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-2xl">🔒</span>
-                <h3 className="font-semibold text-gray-500">My Task Sheet</h3>
-              </div>
-              <p className="text-xs text-gray-600">Complete Phase 1 to unlock</p>
+          {/* Task Sheet — always unlocked */}
+          <Link
+            href="/tasks"
+            className="bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-gray-600 transition-colors"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-2xl">✅</span>
+              <h3 className="font-semibold">My Task Sheet</h3>
             </div>
-          )}
+            <div className="text-sm text-gray-400">{tasks.data?.length ?? 0} tasks checked off this week</div>
+          </Link>
         </div>
       </main>
     </div>
