@@ -138,6 +138,7 @@ export default function TasksPage() {
   const [reportText, setReportText] = useState('')
   const [generatingReport, setGeneratingReport] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [savingDoc, setSavingDoc] = useState(false)
   const [reportMeta, setReportMeta] = useState<{ name: string; weekOf: string }>({ name: '', weekOf: '' })
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const toggleSection = (key: string) => setCollapsed(p => ({ ...p, [key]: !p[key] }))
@@ -804,19 +805,26 @@ export default function TasksPage() {
                       {copied ? 'Copied!' : 'Copy'}
                     </button>
                     <button
-                      onClick={() => {
-                        const html = buildReportHtml(reportText, reportMeta.name, reportMeta.weekOf)
-                        const blob = new Blob([html], { type: 'text/html' })
-                        const url = URL.createObjectURL(blob)
-                        const a = document.createElement('a')
-                        a.href = url
-                        a.download = `EOW Report — ${reportMeta.name} — ${reportMeta.weekOf}.html`
-                        a.click()
-                        URL.revokeObjectURL(url)
+                      onClick={async () => {
+                        setSavingDoc(true)
+                        try {
+                          const res = await fetch('/api/eow-doc', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ reportText, memberName: reportMeta.name, weekOf: reportMeta.weekOf }),
+                          })
+                          const data = await res.json()
+                          if (data.docUrl) window.open(data.docUrl, '_blank')
+                          else alert('Failed to create Google Doc: ' + (data.error ?? 'Unknown error'))
+                        } catch {
+                          alert('Failed to create Google Doc.')
+                        }
+                        setSavingDoc(false)
                       }}
-                      className="text-sm bg-blue-700 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+                      disabled={savingDoc}
+                      className="text-sm bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors"
                     >
-                      Download Doc
+                      {savingDoc ? 'Creating...' : 'Save as Google Doc'}
                     </button>
                   </>
                 )}
