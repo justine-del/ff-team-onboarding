@@ -31,8 +31,14 @@ const LESSONS = [
 
 const CATEGORIES = ['Orientation - Video', 'Ramp - Video', 'Quiz']
 
+type CompletionData = { completed: boolean; completed_at: string | null }
+
+function formatCompletedAt(ts: string): string {
+  return new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
 export default function Phase2Page() {
-  const [completions, setCompletions] = useState<Record<number, boolean>>({})
+  const [completions, setCompletions] = useState<Record<number, CompletionData>>({})
   const [userId, setUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -45,11 +51,11 @@ export default function Phase2Page() {
 
       const { data } = await supabase
         .from('lesson_completion')
-        .select('lesson_id, completed')
+        .select('lesson_id, completed, completed_at')
         .eq('user_id', user.id)
 
-      const map: Record<number, boolean> = {}
-      data?.forEach(row => { map[row.lesson_id] = row.completed })
+      const map: Record<number, CompletionData> = {}
+      data?.forEach(row => { map[row.lesson_id] = { completed: row.completed, completed_at: row.completed_at } })
       setCompletions(map)
       setLoading(false)
     }
@@ -59,19 +65,21 @@ export default function Phase2Page() {
   async function toggleLesson(lessonId: number) {
     if (!userId) return
     const supabase = createClient()
-    const newVal = !completions[lessonId]
+    const current = completions[lessonId]
+    const newVal = !(current?.completed ?? false)
+    const now = new Date().toISOString()
 
     await supabase.from('lesson_completion').upsert({
       user_id: userId,
       lesson_id: lessonId,
       completed: newVal,
-      completed_at: newVal ? new Date().toISOString() : null,
+      completed_at: newVal ? now : null,
     }, { onConflict: 'user_id,lesson_id' })
 
-    setCompletions(prev => ({ ...prev, [lessonId]: newVal }))
+    setCompletions(prev => ({ ...prev, [lessonId]: { completed: newVal, completed_at: newVal ? now : null } }))
   }
 
-  const totalDone = LESSONS.filter(l => completions[l.id]).length
+  const totalDone = LESSONS.filter(l => completions[l.id]?.completed).length
 
   if (loading) {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">Loading...</div>
@@ -83,6 +91,14 @@ export default function Phase2Page() {
         <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">← Dashboard</Link>
         <h1 className="text-lg font-bold">Phase 2: Cyborg VA Incubator — Foundations</h1>
       </nav>
+
+      {/* Quick nav tabs */}
+      <div className="border-b border-gray-800 px-6 flex gap-1 overflow-x-auto">
+        <Link href="/onboarding/phase1" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">🔧 Phase 1</Link>
+        <span className="text-sm text-white px-3 py-2.5 border-b-2 border-white whitespace-nowrap">🎓 Phase 2</span>
+        <Link href="/onboarding/sops" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">📋 SOPs</Link>
+        <Link href="/tasks" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">✅ Task Sheet</Link>
+      </div>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
@@ -98,7 +114,7 @@ export default function Phase2Page() {
         <div className="space-y-8">
           {CATEGORIES.map(category => {
             const lessons = LESSONS.filter(l => l.category === category)
-            const catDone = lessons.filter(l => completions[l.id]).length
+            const catDone = lessons.filter(l => completions[l.id]?.completed).length
 
             return (
               <div key={category}>
@@ -108,7 +124,8 @@ export default function Phase2Page() {
                 </div>
                 <div className="space-y-2">
                   {lessons.map(lesson => {
-                    const done = completions[lesson.id] ?? false
+                    const data = completions[lesson.id]
+                    const done = data?.completed ?? false
                     return (
                       <div key={lesson.id} className={`flex items-start gap-3 p-4 rounded-xl border transition-colors ${done ? 'bg-green-900/20 border-green-800/50' : 'bg-gray-900 border-gray-800'}`}>
                         <button
@@ -132,6 +149,9 @@ export default function Phase2Page() {
                               </a>
                             )}
                             <span className="text-xs text-gray-500">~{lesson.benchmark_mins} mins</span>
+                            {done && data?.completed_at && (
+                              <span className="text-xs text-green-500">✓ {formatCompletedAt(data.completed_at)}</span>
+                            )}
                           </div>
                         </div>
                       </div>

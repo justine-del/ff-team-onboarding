@@ -17,8 +17,14 @@ const SOPS = [
   { id: 10, priority: 'HIGH',     name: 'ClickUp Training',                est_minutes: 20, doc_link: 'https://docs.google.com/document/d/14mB6RywUjrdX0ZsNSLMIKD16eDFv6i_nLlhrZ-138z0/edit?tab=t.8yg4y9ikur76#heading=h.r006pmpy0wwk' },
 ]
 
+type CompletionData = { completed: boolean; completed_at: string | null }
+
+function formatCompletedAt(ts: string): string {
+  return new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
 export default function SOPsPage() {
-  const [completions, setCompletions] = useState<Record<number, boolean>>({})
+  const [completions, setCompletions] = useState<Record<number, CompletionData>>({})
   const [userId, setUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -31,11 +37,11 @@ export default function SOPsPage() {
 
       const { data } = await supabase
         .from('sop_completion')
-        .select('sop_id, completed')
+        .select('sop_id, completed, completed_at')
         .eq('user_id', user.id)
 
-      const map: Record<number, boolean> = {}
-      data?.forEach(row => { map[row.sop_id] = row.completed })
+      const map: Record<number, CompletionData> = {}
+      data?.forEach(row => { map[row.sop_id] = { completed: row.completed, completed_at: row.completed_at } })
       setCompletions(map)
       setLoading(false)
     }
@@ -45,19 +51,21 @@ export default function SOPsPage() {
   async function toggleSOP(sopId: number) {
     if (!userId) return
     const supabase = createClient()
-    const newVal = !completions[sopId]
+    const current = completions[sopId]
+    const newVal = !(current?.completed ?? false)
+    const now = new Date().toISOString()
 
     await supabase.from('sop_completion').upsert({
       user_id: userId,
       sop_id: sopId,
       completed: newVal,
-      completed_at: newVal ? new Date().toISOString() : null,
+      completed_at: newVal ? now : null,
     }, { onConflict: 'user_id,sop_id' })
 
-    setCompletions(prev => ({ ...prev, [sopId]: newVal }))
+    setCompletions(prev => ({ ...prev, [sopId]: { completed: newVal, completed_at: newVal ? now : null } }))
   }
 
-  const totalDone = SOPS.filter(s => completions[s.id]).length
+  const totalDone = SOPS.filter(s => completions[s.id]?.completed).length
   const allDone = totalDone === SOPS.length
 
   const criticals = SOPS.filter(s => s.priority === 'CRITICAL')
@@ -73,6 +81,14 @@ export default function SOPsPage() {
         <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">← Dashboard</Link>
         <h1 className="text-lg font-bold">FF Core SOPs</h1>
       </nav>
+
+      {/* Quick nav tabs */}
+      <div className="border-b border-gray-800 px-6 flex gap-1 overflow-x-auto">
+        <Link href="/onboarding/phase1" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">🔧 Phase 1</Link>
+        <Link href="/onboarding/phase2" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">🎓 Phase 2</Link>
+        <span className="text-sm text-white px-3 py-2.5 border-b-2 border-white whitespace-nowrap">📋 SOPs</span>
+        <Link href="/tasks" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">✅ Task Sheet</Link>
+      </div>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
@@ -94,7 +110,8 @@ export default function SOPsPage() {
             </div>
             <div className="space-y-2">
               {group.items.map(sop => {
-                const done = completions[sop.id] ?? false
+                const data = completions[sop.id]
+                const done = data?.completed ?? false
                 return (
                   <div key={sop.id} className={`flex items-start gap-3 p-4 rounded-xl border transition-colors ${done ? 'bg-green-900/20 border-green-800/50' : 'bg-gray-900 border-gray-800'}`}>
                     <button
@@ -105,7 +122,7 @@ export default function SOPsPage() {
                     </button>
                     <div className="flex-1">
                       <p className="font-medium text-sm">{sop.name}</p>
-                      <div className="flex items-center gap-3 mt-1.5">
+                      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                         <a
                           href={sop.doc_link}
                           target="_blank"
@@ -115,6 +132,9 @@ export default function SOPsPage() {
                           View SOP →
                         </a>
                         <span className="text-xs text-gray-500">~{sop.est_minutes} mins</span>
+                        {done && data?.completed_at && (
+                          <span className="text-xs text-green-500">✓ {formatCompletedAt(data.completed_at)}</span>
+                        )}
                       </div>
                     </div>
                   </div>

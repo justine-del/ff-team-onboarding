@@ -114,6 +114,14 @@ export default async function DashboardPage() {
         </div>
         <div className="text-xs text-gray-400">{tasks.data?.length ?? 0} tasks checked off this week</div>
       </Link>
+
+      <Link href="/chat" className={cardClass}>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xl">🤖</span>
+          <h3 className="font-semibold text-sm">VA Assistant</h3>
+        </div>
+        <div className="text-xs text-gray-400">Ask anything about SOPs & policies</div>
+      </Link>
     </>
   )
 
