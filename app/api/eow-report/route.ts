@@ -80,16 +80,9 @@ Write a professional EOW report using EXACTLY this format and structure:
 
 [2-3 specific, actionable bullet points based on the week's performance.]
 
-**4. Professional Message to Founder**
+**4. Message to Founder (Slack)**
 
-Subject: Weekly Performance Summary — ${weekOf}
-
-Hi [Founder],
-
-[2-3 sentences: briefly summarize the week's overall performance, mention anything notable or something to flag, and close with a forward-looking commitment for next week.]
-
-Best regards,
-${memberName}
+[Write this as a Slack message — casual but professional, no subject line, no "Best regards" sign-off. Start with a greeting like "Hey [Founder's name]!" then 2-3 sentences: briefly summarize the week's overall performance in first person (I/me), mention anything notable or flag anything that needs attention, and close with a short forward-looking note for next week. Keep it conversational like a real Slack message.]
 
 Keep the tone professional and honest. Use only the data provided. Do not invent tasks or numbers.`
 
