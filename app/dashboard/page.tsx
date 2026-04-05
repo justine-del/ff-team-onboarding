@@ -39,13 +39,50 @@ export default async function DashboardPage() {
   const weekStarts8 = getWeekStarts(8)
   const currentWeek = weekStarts8[0]
 
-  const [phase1, phase2, sops, tasks, weeklyStats] = await Promise.all([
+  const isAdminUser = profile?.role === 'admin'
+
+  const [phase1, phase2, sops, tasks, weeklyStats, allMembers] = await Promise.all([
     supabase.from('phase1_completion').select('status').eq('user_id', user.id),
     supabase.from('lesson_completion').select('completed').eq('user_id', user.id).eq('completed', true),
     supabase.from('sop_completion').select('completed').eq('user_id', user.id).eq('completed', true),
     supabase.from('task_completions').select('completed').eq('user_id', user.id).eq('completed', true),
     supabase.from('task_completions').select('week_start, day, time_spent').eq('user_id', user.id).in('week_start', weekStarts8),
+    isAdminUser
+      ? admin.from('profiles').select('id').eq('role', 'member')
+      : Promise.resolve({ data: [] }),
   ])
+
+  // Admin: fetch this week's activity summary for all members
+  let teamStats: { active: number; inconsistent: number; needsAttention: number; noActivity: number } | null = null
+  if (isAdminUser && allMembers.data && allMembers.data.length > 0) {
+    const memberIds = allMembers.data.map((m: { id: string }) => m.id)
+    const { data: thisWeekRows } = await admin
+      .from('task_completions')
+      .select('user_id, time_spent')
+      .in('user_id', memberIds)
+      .eq('week_start', currentWeek)
+      .gt('time_spent', 0)
+
+    const { data: lastWeekRows } = await admin
+      .from('task_completions')
+      .select('user_id, time_spent')
+      .in('user_id', memberIds)
+      .eq('week_start', weekStarts8[1])
+      .gt('time_spent', 0)
+
+    const thisWeekActive = new Set(thisWeekRows?.map(r => r.user_id) ?? [])
+    const lastWeekActive = new Set(lastWeekRows?.map(r => r.user_id) ?? [])
+
+    let active = 0, inconsistent = 0, needsAttention = 0, noActivity = 0
+    for (const id of memberIds) {
+      if (thisWeekActive.has(id)) active++
+      else if (lastWeekActive.has(id)) inconsistent++
+      else noActivity++
+    }
+    inconsistent = inconsistent
+    needsAttention = memberIds.length - active - inconsistent - noActivity
+    teamStats = { active, inconsistent, needsAttention, noActivity }
+  }
 
   const phase1Done = phase1.data?.filter(t => t.status === 'done').length ?? 0
   const phase1Total = 18
@@ -192,6 +229,39 @@ export default async function DashboardPage() {
         ) : (
           /* Returning user — progress + cards */
           <div>
+            {/* Admin: team performance overview */}
+            {isAdminUser && teamStats && (
+              <div className="mb-6 bg-gray-900 border border-gray-800 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-semibold text-base">Team Performance This Week</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">{allMembers.data?.length ?? 0} members total</p>
+                  </div>
+                  <Link href="/admin/performance" className="text-xs text-purple-400 hover:text-purple-300 transition-colors">
+                    View full report →
+                  </Link>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-green-950/40 border border-green-800/40 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-green-400">{teamStats.active}</div>
+                    <div className="text-xs text-green-500 mt-0.5">Logged this week</div>
+                  </div>
+                  <div className="bg-yellow-950/40 border border-yellow-800/40 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-yellow-400">{teamStats.inconsistent}</div>
+                    <div className="text-xs text-yellow-500 mt-0.5">Active last week only</div>
+                  </div>
+                  <div className="bg-red-950/40 border border-red-800/40 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-red-400">{teamStats.noActivity}</div>
+                    <div className="text-xs text-red-500 mt-0.5">No recent activity</div>
+                  </div>
+                  <div className="bg-gray-800/40 border border-gray-700/40 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-gray-300">{allMembers.data?.length ?? 0}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">Total members</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Member stats + charts */}
             {profile?.role === 'member' && (
               <MemberStats
