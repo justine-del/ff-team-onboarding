@@ -270,14 +270,12 @@ export default async function DashboardPage() {
               </div>
             )}
 
-            {/* Member stats + charts */}
-            {profile?.role === 'member' && (
-              <MemberStats
-                rows={weeklyStats.data ?? []}
-                currentWeek={currentWeek}
-                memberName={firstName}
-              />
-            )}
+            {/* Personal stats + charts — all users */}
+            <MemberStats
+              rows={weeklyStats.data ?? []}
+              currentWeek={currentWeek}
+              memberName={firstName}
+            />
 
             <div className="mb-8">
               <h2 className="text-2xl font-bold mb-1">Hi {firstName}! Here&apos;s your onboarding progress.</h2>
