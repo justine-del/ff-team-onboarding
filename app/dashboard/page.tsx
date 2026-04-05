@@ -177,6 +177,14 @@ export default async function DashboardPage() {
         </div>
         <div className="text-xs text-gray-400">Ask anything about SOPs & policies</div>
       </Link>
+
+      <Link href="/wellness" className={cardClass}>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xl">💙</span>
+          <h3 className="font-semibold text-sm">Wellness Check</h3>
+        </div>
+        <div className="text-xs text-gray-400">How are you feeling today?</div>
+      </Link>
     </>
   )
 

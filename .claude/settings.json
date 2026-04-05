@@ -4,7 +4,9 @@
       "Bash(npm run:*)",
       "Bash(curl -L \"https://docs.google.com/document/d/1NJuL84S501vb9JA2XY9Y5BBnpT8j4zvGB_ixoty4czY/export?format=txt\")",
       "Bash(npx tsc:*)",
-      "Bash(node -e ':*)"
+      "Bash(node -e ':*)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Justine\\OneDrive\\Documents\\ff-onboarding\\app\\admin"
