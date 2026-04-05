@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import QuickNav from '@/components/QuickNav'
 
 const BASE = 'https://docs.google.com/document/d/1ipxjN1qkppZCttHQ8JNJqhy5EJafdN830INj01BosK4/edit'
 
@@ -92,13 +93,7 @@ export default function Phase2Page() {
         <h1 className="text-lg font-bold">Phase 2: Cyborg VA Incubator — Foundations</h1>
       </nav>
 
-      {/* Quick nav tabs */}
-      <div className="border-b border-gray-800 px-6 flex gap-1 overflow-x-auto">
-        <Link href="/onboarding/phase1" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">🔧 Phase 1</Link>
-        <span className="text-sm text-white px-3 py-2.5 border-b-2 border-white whitespace-nowrap">🎓 Phase 2</span>
-        <Link href="/onboarding/sops" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">📋 SOPs</Link>
-        <Link href="/tasks" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">✅ Task Sheet</Link>
-      </div>
+      <QuickNav />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">

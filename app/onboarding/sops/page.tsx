@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import QuickNav from '@/components/QuickNav'
 
 const SOPS = [
   { id: 1,  priority: 'CRITICAL', name: 'Funnel Futurist Overview',        est_minutes: 45, doc_link: 'https://docs.google.com/document/d/1-w9XLBzLirHQuicHnScLaAhVEHhV21PyRRVR8mLy0zo/edit?pli=1&tab=t.gtqrj7ku20p4' },
@@ -82,13 +83,7 @@ export default function SOPsPage() {
         <h1 className="text-lg font-bold">FF Core SOPs</h1>
       </nav>
 
-      {/* Quick nav tabs */}
-      <div className="border-b border-gray-800 px-6 flex gap-1 overflow-x-auto">
-        <Link href="/onboarding/phase1" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">🔧 Phase 1</Link>
-        <Link href="/onboarding/phase2" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">🎓 Phase 2</Link>
-        <span className="text-sm text-white px-3 py-2.5 border-b-2 border-white whitespace-nowrap">📋 SOPs</span>
-        <Link href="/tasks" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">✅ Task Sheet</Link>
-      </div>
+      <QuickNav />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import QuickNav from '@/components/QuickNav'
 
 const SECURITY_NOTICES = [
   'Use LastPass or 1Password for all passwords',
@@ -146,6 +147,7 @@ export default function Phase1Page() {
         <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">← Dashboard</Link>
         <h1 className="text-lg font-bold">Phase 1: System Access Setup</h1>
       </nav>
+      <QuickNav />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Admin member selector */}

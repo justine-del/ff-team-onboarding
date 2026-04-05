@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import QuickNav from '@/components/QuickNav'
 
 type Message = { role: 'user' | 'assistant'; content: string }
 
@@ -71,6 +72,7 @@ export default function ChatPage() {
           <p className="text-xs text-gray-500">Ask anything about SOPs, tools, policies, or workflows</p>
         </div>
       </nav>
+      <QuickNav />
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6 max-w-3xl mx-auto w-full">

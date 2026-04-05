@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import QuickNav from '@/components/QuickNav'
 
 const MOODS = [
   { value: 1, emoji: '😰', label: 'Struggling', ring: 'border-red-500',    bg: 'bg-red-950/40'    },
@@ -64,15 +65,14 @@ export default function WellnessPage() {
   const selectedMood = MOODS.find((m) => m.value === mood)
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center px-4 py-10">
+    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+      <nav className="border-b border-gray-800 px-6 py-4 flex items-center gap-4">
+        <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">← Dashboard</Link>
+        <h1 className="text-lg font-bold">Wellness Check</h1>
+      </nav>
+      <QuickNav />
+      <div className="flex flex-col items-center px-4 py-10">
       <div className="w-full max-w-lg">
-        {/* Back link */}
-        <Link
-          href="/dashboard"
-          className="inline-block text-sm text-gray-400 hover:text-white mb-8 transition-colors"
-        >
-          ← Dashboard
-        </Link>
 
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8">
           {/* Header */}
@@ -169,6 +169,7 @@ export default function WellnessPage() {
             </>
           )}
         </div>
+      </div>
       </div>
     </div>
   )

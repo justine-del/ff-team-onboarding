@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import QuickNav from '@/components/QuickNav'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const TIME_OPTIONS = [0, 5, 10, 15, 30, 60, 90, 120, 180, 240, 300, 360]
@@ -446,13 +447,7 @@ export default function TasksPage() {
         </button>
       </nav>
 
-      {/* Quick nav tabs */}
-      <div className="border-b border-gray-800 px-6 flex gap-1 overflow-x-auto">
-        <Link href="/onboarding/phase1" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">🔧 Phase 1</Link>
-        <Link href="/onboarding/phase2" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">🎓 Phase 2</Link>
-        <Link href="/onboarding/sops" className="text-sm text-gray-400 hover:text-white px-3 py-2.5 border-b-2 border-transparent hover:border-gray-600 whitespace-nowrap transition-colors">📋 SOPs</Link>
-        <span className="text-sm text-white px-3 py-2.5 border-b-2 border-white whitespace-nowrap">✅ Task Sheet</span>
-      </div>
+      <QuickNav />
 
       <main className="max-w-5xl mx-auto px-4 py-8">
         {/* Admin member selector */}
