@@ -13,12 +13,14 @@ type MemberStat = {
   job_role: string | null
   consistency: number
   thisWeekHours: string
+  lastWeekHours: string
+  delta: number
   lastActive: string | null
   status: StatusType
   note: string
 }
 
-function getWeekStarts(): string[] {
+function getWeekStarts(n = 4): string[] {
   const now = new Date()
   const day = now.getDay()
   const diff = day === 0 ? -6 : 1 - day
@@ -27,7 +29,7 @@ function getWeekStarts(): string[] {
   monday.setHours(0, 0, 0, 0)
 
   const starts: string[] = []
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < n; i++) {
     const d = new Date(monday)
     d.setDate(monday.getDate() - i * 7)
     starts.push(d.toISOString().split('T')[0])
@@ -97,11 +99,16 @@ export default async function PerformancePage() {
       const activeDays = uniquePairs.size
       const consistency = Math.round(activeDays / 20 * 100)
 
-      // This week hours
+      // This week + last week hours
       const thisWeekMinutes = rows
         .filter(r => r.week_start === currentWeekStart)
         .reduce((sum, r) => sum + (r.time_spent ?? 0), 0)
       const thisWeekHours = (thisWeekMinutes / 60).toFixed(1)
+      const lastWeekMinutes = rows
+        .filter(r => r.week_start === weekStarts[1])
+        .reduce((sum, r) => sum + (r.time_spent ?? 0), 0)
+      const lastWeekHours = (lastWeekMinutes / 60).toFixed(1)
+      const delta = Math.round((thisWeekMinutes - lastWeekMinutes) / 60 * 10) / 10
 
       // Last active: most recent week_start with any completion
       const weeksWithActivity = [...new Set(rows.map(r => r.week_start))].sort().reverse()
@@ -132,6 +139,8 @@ export default async function PerformancePage() {
         job_role: member.job_role,
         consistency,
         thisWeekHours,
+        lastWeekHours,
+        delta,
         lastActive,
         status,
         note,
@@ -218,6 +227,7 @@ export default async function PerformancePage() {
                   <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
                   <th className="text-left py-3 px-4 text-gray-400 font-medium">Consistency (4 wks)</th>
                   <th className="text-left py-3 px-4 text-gray-400 font-medium">This Week</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">vs Last Week</th>
                   <th className="text-left py-3 px-4 text-gray-400 font-medium">Last Active</th>
                   <th className="text-left py-3 px-4 text-gray-400 font-medium">Note</th>
                 </tr>
@@ -266,6 +276,14 @@ export default async function PerformancePage() {
                     {/* This week hours */}
                     <td className="py-3 px-4 tabular-nums text-gray-300">
                       {member.thisWeekHours}h
+                    </td>
+
+                    {/* vs Last week */}
+                    <td className="py-3 px-4 tabular-nums text-xs">
+                      <span className={member.delta > 0 ? 'text-green-400' : member.delta < 0 ? 'text-red-400' : 'text-gray-500'}>
+                        {member.delta > 0 ? `↑ +${member.delta}h` : member.delta < 0 ? `↓ ${member.delta}h` : '— same'}
+                      </span>
+                      <span className="block text-gray-600">{member.lastWeekHours}h last wk</span>
                     </td>
 
                     {/* Last active */}

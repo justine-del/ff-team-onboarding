@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import MemberStats from '@/components/MemberStats'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -21,47 +22,30 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .single()
 
-  // Fetch completion counts + 4-week stats
-  function getWeekStarts() {
+  // Fetch completion counts + 8-week stats for charts
+  function getWeekStarts(n: number) {
     const now = new Date()
     const day = now.getDay()
     const diff = day === 0 ? -6 : 1 - day
     const monday = new Date(now)
     monday.setDate(now.getDate() + diff)
     monday.setHours(0, 0, 0, 0)
-    return Array.from({ length: 4 }, (_, i) => {
+    return Array.from({ length: n }, (_, i) => {
       const d = new Date(monday)
       d.setDate(monday.getDate() - i * 7)
       return d.toISOString().split('T')[0]
     })
   }
-  const weekStarts = getWeekStarts()
-  const currentWeek = weekStarts[0]
+  const weekStarts8 = getWeekStarts(8)
+  const currentWeek = weekStarts8[0]
 
   const [phase1, phase2, sops, tasks, weeklyStats] = await Promise.all([
     supabase.from('phase1_completion').select('status').eq('user_id', user.id),
     supabase.from('lesson_completion').select('completed').eq('user_id', user.id).eq('completed', true),
     supabase.from('sop_completion').select('completed').eq('user_id', user.id).eq('completed', true),
     supabase.from('task_completions').select('completed').eq('user_id', user.id).eq('completed', true),
-    supabase.from('task_completions').select('week_start, day, time_spent').eq('user_id', user.id).in('week_start', weekStarts).gt('time_spent', 0),
+    supabase.from('task_completions').select('week_start, day, time_spent').eq('user_id', user.id).in('week_start', weekStarts8),
   ])
-
-  // Calculate member stats
-  const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
-  const rows = weeklyStats.data ?? []
-  const activeDaySet = new Set(rows.filter(r => WEEKDAYS.includes(r.day)).map(r => `${r.week_start}-${r.day}`))
-  const consistencyPct = Math.round(activeDaySet.size / 20 * 100)
-  const thisWeekMins = rows.filter(r => r.week_start === currentWeek).reduce((s, r) => s + (r.time_spent ?? 0), 0)
-  const thisWeekHours = (thisWeekMins / 60).toFixed(1)
-  const todayDow = new Date().getDay() // 0=Sun, 3=Wed
-  const noTasksYet = thisWeekMins === 0 && todayDow >= 3
-
-  let memberStatus: 'active' | 'inconsistent' | 'needs-attention' =
-    consistencyPct >= 70 ? 'active' : consistencyPct >= 30 ? 'inconsistent' : 'needs-attention'
-  const memberNote =
-    memberStatus === 'active' ? "You're consistently logging tasks — keep it up!"
-    : memberStatus === 'inconsistent' ? "Some gaps in your task logging this month."
-    : "Low activity logged over the last 4 weeks."
 
   const phase1Done = phase1.data?.filter(t => t.status === 'done').length ?? 0
   const phase1Total = 18
@@ -208,39 +192,13 @@ export default async function DashboardPage() {
         ) : (
           /* Returning user — progress + cards */
           <div>
-            {/* Member stats card */}
+            {/* Member stats + charts */}
             {profile?.role === 'member' && (
-              <div className={`mb-6 rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center gap-4 ${
-                memberStatus === 'active' ? 'bg-green-950/30 border-green-800/50'
-                : memberStatus === 'inconsistent' ? 'bg-yellow-950/30 border-yellow-800/50'
-                : 'bg-red-950/30 border-red-800/50'
-              }`}>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                      memberStatus === 'active' ? 'bg-green-800/60 text-green-300'
-                      : memberStatus === 'inconsistent' ? 'bg-yellow-800/60 text-yellow-300'
-                      : 'bg-red-800/60 text-red-300'
-                    }`}>
-                      {memberStatus === 'active' ? '● Active' : memberStatus === 'inconsistent' ? '● Inconsistent' : '● Needs Attention'}
-                    </span>
-                    <span className="text-xs text-gray-500">Last 4 weeks</span>
-                  </div>
-                  <p className="text-sm text-gray-300">{memberNote}{noTasksYet ? ' No tasks logged yet this week.' : ''}</p>
-                </div>
-                <div className="flex gap-6 flex-shrink-0">
-                  <div className="text-center">
-                    <div className={`text-2xl font-bold ${
-                      memberStatus === 'active' ? 'text-green-400' : memberStatus === 'inconsistent' ? 'text-yellow-400' : 'text-red-400'
-                    }`}>{consistencyPct}%</div>
-                    <div className="text-xs text-gray-500">Consistency</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-white">{thisWeekHours}h</div>
-                    <div className="text-xs text-gray-500">This week</div>
-                  </div>
-                </div>
-              </div>
+              <MemberStats
+                rows={weeklyStats.data ?? []}
+                currentWeek={currentWeek}
+                memberName={firstName}
+              />
             )}
 
             <div className="mb-8">
