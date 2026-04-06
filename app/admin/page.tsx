@@ -73,6 +73,9 @@ export default function AdminPage() {
           <Link href="/admin/content" className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
             Edit Links
           </Link>
+          <Link href="/admin/offboarding" className="text-sm bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
+            Offboard VA
+          </Link>
           <Link href="/admin/users" className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
             Manage Users
           </Link>
