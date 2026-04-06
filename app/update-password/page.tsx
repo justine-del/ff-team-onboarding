@@ -11,37 +11,48 @@ export default function UpdatePasswordPage() {
   const [loading, setLoading] = useState(false)
   const [sessionReady, setSessionReady] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
-    // Handle hash-based session from recovery link
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
-        setSessionReady(true)
+    const supabase = createClient()
+
+    async function init() {
+      // Try PKCE code exchange (query param)
+      const params = new URLSearchParams(window.location.search)
+      const code = params.get('code')
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (!error) { setSessionReady(true); return }
       }
-    })
 
-    // Also check if already signed in (e.g. page reload)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setSessionReady(true)
-    })
+      // Try hash-based token (implicit flow)
+      const hash = window.location.hash
+      if (hash) {
+        const hashParams = new URLSearchParams(hash.slice(1))
+        const access_token = hashParams.get('access_token')
+        const refresh_token = hashParams.get('refresh_token')
+        if (access_token && refresh_token) {
+          const { error } = await supabase.auth.setSession({ access_token, refresh_token })
+          if (!error) { setSessionReady(true); return }
+        }
+      }
 
-    return () => subscription.unsubscribe()
+      // Fallback: already signed in
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) { setSessionReady(true); return }
+
+      setError('Your link has expired or is invalid. Ask admin for a new one.')
+    }
+
+    init()
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (password !== confirm) {
-      setError('Passwords do not match.')
-      return
-    }
+    if (password !== confirm) { setError('Passwords do not match.'); return }
     setLoading(true)
+    const supabase = createClient()
     const { error: err } = await supabase.auth.updateUser({ password })
-    if (err) {
-      setError(err.message)
-      setLoading(false)
-      return
-    }
+    if (err) { setError(err.message); setLoading(false); return }
     router.push('/dashboard')
   }
 
@@ -51,29 +62,28 @@ export default function UpdatePasswordPage() {
         <h2 className="text-xl font-semibold text-white mb-2">Set your password</h2>
         <p className="text-gray-400 text-sm mb-6">Choose a strong password for your Cyborg VA account.</p>
 
-        {!sessionReady ? (
+        {error && <div className="mb-4 p-3 bg-red-900/40 border border-red-700 rounded-lg text-red-300 text-sm">{error}</div>}
+
+        {!sessionReady && !error ? (
           <div className="text-center text-gray-400 text-sm py-4">Verifying your link...</div>
-        ) : (
-          <>
-            {error && <div className="mb-4 p-3 bg-red-900/40 border border-red-700 rounded-lg text-red-300 text-sm">{error}</div>}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">New Password</label>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Confirm Password</label>
-                <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <button type="submit" disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors">
-                {loading ? 'Saving...' : 'Set Password & Sign In'}
-              </button>
-            </form>
-          </>
-        )}
+        ) : sessionReady ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">New Password</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Confirm Password</label>
+              <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <button type="submit" disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors">
+              {loading ? 'Saving...' : 'Set Password & Sign In'}
+            </button>
+          </form>
+        ) : null}
       </div>
     </div>
   )
