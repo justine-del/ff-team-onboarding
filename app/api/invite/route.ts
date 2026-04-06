@@ -11,13 +11,17 @@ export async function POST(request: NextRequest) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
-  const { data, error } = await supabase.auth.admin.inviteUserByEmail(email)
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+  // Create user without sending any email
+  const { data: createData, error: createError } = await supabase.auth.admin.createUser({
+    email,
+    email_confirm: true,
+  })
+  if (createError) {
+    return NextResponse.json({ error: createError.message }, { status: 400 })
   }
 
   await supabase.from('profiles').insert({
-    id: data.user.id,
+    id: createData.user.id,
     email,
     first_name,
     last_name,
@@ -26,5 +30,14 @@ export async function POST(request: NextRequest) {
     start_date: start_date || null,
   })
 
-  return NextResponse.json({ success: true })
+  // Generate a password-setup link (no email sent — we return it to admin)
+  const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+    type: 'recovery',
+    email,
+    options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ff-team-onboarding.vercel.app'}/update-password` },
+  })
+
+  const invite_link = linkError ? null : linkData.properties.action_link
+
+  return NextResponse.json({ success: true, invite_link })
 }

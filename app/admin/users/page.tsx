@@ -20,6 +20,7 @@ export default function UsersPage() {
   const [form, setForm] = useState({ first_name: '', last_name: '', email: '', job_role: '', start_date: '' })
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [inviteLink, setInviteLink] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -53,7 +54,7 @@ export default function UsersPage() {
     if (result.error) {
       setMessage(`Error: ${result.error}`)
     } else {
-      setMessage(`Invite sent to ${form.email}!`)
+      setInviteLink(result.invite_link)
       setForm({ first_name: '', last_name: '', email: '', job_role: '', start_date: '' })
       setShowInviteForm(false)
       // Reload members
@@ -83,6 +84,22 @@ export default function UsersPage() {
         {message && (
           <div className={`mb-4 p-3 rounded-lg text-sm ${message.startsWith('Error') ? 'bg-red-900/40 border border-red-700 text-red-300' : 'bg-green-900/40 border border-green-700 text-green-300'}`}>
             {message}
+          </div>
+        )}
+
+        {inviteLink && (
+          <div className="mb-4 p-4 rounded-lg bg-blue-900/40 border border-blue-700 text-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-blue-300 font-medium">Member added! Share this invite link:</span>
+              <button
+                onClick={() => { navigator.clipboard.writeText(inviteLink); setMessage('Link copied!') }}
+                className="text-xs bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded transition-colors"
+              >
+                Copy Link
+              </button>
+            </div>
+            <p className="text-gray-400 break-all text-xs">{inviteLink}</p>
+            <p className="text-gray-500 text-xs mt-2">This link lets them set their password and log in. Share via Slack or email.</p>
           </div>
         )}
 
