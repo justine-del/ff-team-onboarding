@@ -148,6 +148,35 @@ export default async function PerformancePage() {
     })
   )
 
+  // Wellness data
+  const oneWeekAgo = new Date()
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+
+  const { data: flaggedCheckins } = await admin
+    .from('wellness_checkins')
+    .select('user_id, mood, note, ai_response, created_at')
+    .eq('flagged', true)
+    .gte('created_at', oneWeekAgo.toISOString())
+    .order('created_at', { ascending: false })
+
+  const { data: recentCheckins } = await admin
+    .from('wellness_checkins')
+    .select('user_id, mood, created_at')
+    .gte('created_at', oneWeekAgo.toISOString())
+
+  // Build mood summary per user
+  const moodByUser: Record<string, number[]> = {}
+  for (const c of recentCheckins ?? []) {
+    if (!moodByUser[c.user_id]) moodByUser[c.user_id] = []
+    moodByUser[c.user_id].push(c.mood)
+  }
+
+  // Build name lookup from members
+  const memberNameMap: Record<string, string> = {}
+  for (const m of members ?? []) {
+    memberNameMap[m.id] = `${m.first_name} ${m.last_name}`.trim() || m.email
+  }
+
   // Sort: needs-attention → inconsistent → active
   const sorted = [...memberStats].sort(
     (a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
@@ -301,6 +330,74 @@ export default async function PerformancePage() {
             </table>
           </div>
         )}
+        {/* Wellness Recap */}
+        <div className="mt-10">
+          <h2 className="text-base font-semibold text-gray-200 mb-4">💙 Wellness Recap (Last 7 Days)</h2>
+
+          {/* Flagged check-ins */}
+          {(flaggedCheckins ?? []).length > 0 && (
+            <div className="mb-6 bg-red-950/40 border border-red-800/50 rounded-xl p-4">
+              <p className="text-sm font-semibold text-red-300 mb-3">⚠️ Flagged Check-ins (Mood 1–2)</p>
+              <div className="space-y-3">
+                {(flaggedCheckins ?? []).map((c, i) => (
+                  <div key={i} className="border-t border-red-800/30 pt-3 first:border-0 first:pt-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium text-white">
+                        {memberNameMap[c.user_id] ?? c.user_id}
+                      </span>
+                      <span className="text-xs bg-red-900/60 text-red-300 px-2 py-0.5 rounded-full">
+                        Mood {c.mood}/5
+                      </span>
+                      <span className="text-xs text-gray-500 ml-auto">
+                        {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    {c.note && (
+                      <p className="text-xs text-gray-300 italic ml-0">"{c.note}"</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Per-member mood summary */}
+          {Object.keys(moodByUser).length > 0 ? (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 bg-gray-900/60">
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Member</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Check-ins</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Avg Mood</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Trend</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(moodByUser).map(([uid, moods], idx, arr) => {
+                    const avg = moods.reduce((a, b) => a + b, 0) / moods.length
+                    const moodEmoji = avg >= 4 ? '😊' : avg >= 3 ? '🙂' : avg >= 2 ? '😐' : '😟'
+                    const avgColor = avg >= 4 ? 'text-green-300' : avg >= 3 ? 'text-yellow-300' : 'text-red-300'
+                    const dots = moods.slice(-5).map(m => {
+                      const c = m >= 4 ? '🟢' : m >= 3 ? '🟡' : '🔴'
+                      return c
+                    }).join(' ')
+                    return (
+                      <tr key={uid} className={`border-b border-gray-800/50 ${idx === arr.length - 1 ? 'border-b-0' : ''}`}>
+                        <td className="py-3 px-4 font-medium">{memberNameMap[uid] ?? uid}</td>
+                        <td className="py-3 px-4 text-gray-400">{moods.length}</td>
+                        <td className={`py-3 px-4 font-semibold ${avgColor}`}>{moodEmoji} {avg.toFixed(1)}</td>
+                        <td className="py-3 px-4 text-base">{dots}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">No wellness check-ins in the past 7 days.</p>
+          )}
+        </div>
       </main>
     </div>
   )

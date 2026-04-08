@@ -180,6 +180,8 @@ export default function TasksPage() {
   const [reportText, setReportText] = useState('')
   const [generatingReport, setGeneratingReport] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [savingCell, setSavingCell] = useState<string | null>(null)
   const [reportMeta, setReportMeta] = useState<{ name: string; weekOf: string }>({ name: '', weekOf: '' })
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const toggleSection = (key: string) => setCollapsed(p => ({ ...p, [key]: !p[key] }))
@@ -259,12 +261,20 @@ export default function TasksPage() {
     if (!userId || !!selectedMemberId) return
     const supabase = createClient()
     const key = taskId > 10000 ? `custom-${taskId - 10000}-${day}` : `${taskId}-${day}`
-    await supabase.from('task_completions').upsert({
+    const prev = completions[key] ?? 0
+    setSavingCell(key)
+    setCompletions(c => ({ ...c, [key]: minutes }))
+    const { error } = await supabase.from('task_completions').upsert({
       user_id: userId, task_id: taskId, week_start: weekStart, day,
       time_spent: minutes, completed: minutes > 0,
       completed_at: minutes > 0 ? new Date().toISOString() : null
     }, { onConflict: 'user_id,task_id,week_start,day' })
-    setCompletions(prev => ({ ...prev, [key]: minutes }))
+    if (error) {
+      setCompletions(c => ({ ...c, [key]: prev }))
+      setSaveError(`Failed to save (${day}): ${error.message}`)
+      setTimeout(() => setSaveError(null), 5000)
+    }
+    setSavingCell(null)
   }
 
   // EOW tasks use binary toggle
@@ -274,12 +284,17 @@ export default function TasksPage() {
     const key = `${taskId}-${day}`
     const current = completions[key] ?? 0
     const newVal = current > 0 ? 0 : 30
-    await supabase.from('task_completions').upsert({
+    setCompletions(c => ({ ...c, [key]: newVal }))
+    const { error } = await supabase.from('task_completions').upsert({
       user_id: userId, task_id: taskId, week_start: weekStart, day,
       time_spent: newVal, completed: newVal > 0,
       completed_at: newVal > 0 ? new Date().toISOString() : null
     }, { onConflict: 'user_id,task_id,week_start,day' })
-    setCompletions(prev => ({ ...prev, [key]: newVal }))
+    if (error) {
+      setCompletions(c => ({ ...c, [key]: current }))
+      setSaveError(`Failed to save (${day}): ${error.message}`)
+      setTimeout(() => setSaveError(null), 5000)
+    }
   }
 
   async function toggleDayOff(day: string) {
@@ -365,6 +380,7 @@ export default function TasksPage() {
           tasks: allTasks,
           weeklyHours,
           dayOffs,
+          userId,
         }),
       })
       const data = await res.json()
@@ -471,6 +487,14 @@ export default function TasksPage() {
                 {selectedMemberId && <span className="text-xs text-yellow-400 flex-shrink-0">Read-only view</span>}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Save error toast */}
+        {saveError && (
+          <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-xl text-sm text-red-300 flex items-center justify-between">
+            <span>{saveError}</span>
+            <button onClick={() => setSaveError(null)} className="ml-4 text-red-400 hover:text-white">✕</button>
           </div>
         )}
 
@@ -704,14 +728,15 @@ export default function TasksPage() {
                         const isOff = dayOffs[d] === 'off'
                         const key = `custom-${task.id}-${d}`
                         const mins = completions[key] ?? 0
+                        const isSaving = savingCell === key
                         return (
                           <td key={d} className={`text-center py-3 px-1 align-top ${isOff ? 'opacity-25' : ''}`}>
                             {isTaskDay && !isOff ? (
                               <select
                                 value={mins}
                                 onChange={e => setTaskTime(task.id + 10000, d, parseInt(e.target.value))}
-                                disabled={!!selectedMemberId}
-                                className={`text-xs rounded px-1 py-0.5 border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer w-14 ${timeBadgeClass(mins)} ${selectedMemberId ? 'cursor-default' : ''}`}
+                                disabled={!!selectedMemberId || isSaving}
+                                className={`text-xs rounded px-1 py-0.5 border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer w-14 ${isSaving ? 'opacity-50' : ''} ${timeBadgeClass(mins)} ${selectedMemberId ? 'cursor-default' : ''}`}
                               >
                                 {TIME_OPTIONS.map(t => (
                                   <option key={t} value={t} className="bg-gray-900 text-white">{formatTime(t)}</option>

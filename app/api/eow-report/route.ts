@@ -1,11 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 export async function POST(req: NextRequest) {
   try {
-    const { memberName, weekOf, tasks, weeklyHours, dayOffs } = await req.json()
+    const { memberName, weekOf, tasks, weeklyHours, dayOffs, userId } = await req.json()
 
     type Task = { name: string; days: string[]; loggedDays: Record<string, number>; totalMins: number }
     const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -93,6 +94,21 @@ Keep the tone professional and honest. Use only the data provided. Do not invent
     })
 
     const report = message.content[0].type === 'text' ? message.content[0].text : ''
+
+    if (userId) {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      )
+      await supabase.from('eow_reports').insert({
+        user_id: userId,
+        member_name: memberName,
+        week_of: weekOf,
+        report_text: report,
+      })
+    }
+
     return NextResponse.json({ report })
   } catch (err) {
     console.error('EOW report error:', err)

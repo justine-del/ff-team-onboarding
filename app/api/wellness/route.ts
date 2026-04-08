@@ -41,6 +41,7 @@ End with one short encouraging line for their workday.`
     mood,
     note: note || null,
     ai_response: reply,
+    flagged: mood <= 2,
   })
 
   return Response.json({ reply })
