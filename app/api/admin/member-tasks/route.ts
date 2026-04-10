@@ -23,11 +23,12 @@ export async function GET(req: NextRequest) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
-  const [completions, customTasks, vaLinks, dayOffs] = await Promise.all([
+  const [completions, customTasks, vaLinks, dayOffs, taskNotes] = await Promise.all([
     admin.from('task_completions').select('task_id, day, completed, time_spent').eq('user_id', memberId).eq('week_start', weekStart),
     admin.from('va_custom_tasks').select('*').eq('user_id', memberId).eq('active', true),
     admin.from('va_task_links').select('task_id, loom_link, sop_doc_link').eq('user_id', memberId),
     admin.from('day_off').select('day, type').eq('user_id', memberId).eq('week_start', weekStart),
+    admin.from('va_task_notes').select('task_id, note').eq('user_id', memberId).eq('week_start', weekStart),
   ])
 
   return NextResponse.json({
@@ -35,5 +36,6 @@ export async function GET(req: NextRequest) {
     customTasks: customTasks.data ?? [],
     vaLinks: vaLinks.data ?? [],
     dayOffs: dayOffs.data ?? [],
+    taskNotes: taskNotes.data ?? [],
   })
 }

@@ -6,7 +6,7 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 export async function POST(req: NextRequest) {
   try {
-    const { memberName, weekOf, tasks, weeklyHours, dayOffs, userId } = await req.json()
+    const { memberName, weekOf, tasks, weeklyHours, dayOffs, userId, taskNotes } = await req.json()
 
     type Task = { name: string; days: string[]; loggedDays: Record<string, number>; totalMins: number }
     const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -85,7 +85,8 @@ Write a professional EOW report using EXACTLY this format and structure:
 
 [Write this as a Slack message — casual but professional, no subject line, no "Best regards" sign-off. Start with a greeting like "Hey [Founder's name]!" then 2-3 sentences: briefly summarize the week's overall performance in first person (I/me), mention anything notable or flag anything that needs attention, and close with a short forward-looking note for next week. Keep it conversational like a real Slack message.]
 
-Keep the tone professional and honest. Use only the data provided. Do not invent tasks or numbers.`
+Keep the tone professional and honest. Use only the data provided. Do not invent tasks or numbers.
+${taskNotes?.length ? `\nMember's own task notes (use as supporting context for takeaways and recommendations — do not quote verbatim):\n${(taskNotes as string[]).join('\n')}` : ''}`
 
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',

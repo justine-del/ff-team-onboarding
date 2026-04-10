@@ -185,6 +185,8 @@ export default function TasksPage() {
   const [reportMeta, setReportMeta] = useState<{ name: string; weekOf: string }>({ name: '', weekOf: '' })
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const toggleSection = (key: string) => setCollapsed(p => ({ ...p, [key]: !p[key] }))
+  const [taskNotes, setTaskNotes] = useState<Record<string, string>>({})
+  const [expandedNote, setExpandedNote] = useState<string | null>(null)
 
   const monday = getMonday()
   const weekStart = monday.toISOString().split('T')[0]
@@ -225,6 +227,7 @@ export default function TasksPage() {
       let customTasksData: CustomTask[] = []
       let vaLinksData: VALink[] = []
       let dayOffsData: { day: string; type: string }[] = []
+      let taskNotesData: { task_id: number; note: string }[] = []
 
       if (selectedMemberId) {
         // Admin viewing a member — use service-role API to bypass RLS
@@ -235,20 +238,23 @@ export default function TasksPage() {
           customTasksData = json.customTasks
           vaLinksData = json.vaLinks
           dayOffsData = json.dayOffs
+          taskNotesData = json.taskNotes ?? []
         }
       } else {
         // Member viewing their own data — direct client queries (RLS: auth.uid() = user_id)
         const supabase = createClient()
-        const [completionData, linkData, customData, dayOffData] = await Promise.all([
+        const [completionData, linkData, customData, dayOffData, noteData] = await Promise.all([
           supabase.from('task_completions').select('task_id, day, completed, time_spent').eq('user_id', viewingId).eq('week_start', weekStart),
           supabase.from('va_task_links').select('task_id, loom_link, sop_doc_link').eq('user_id', viewingId),
           supabase.from('va_custom_tasks').select('*').eq('user_id', viewingId).eq('active', true),
           supabase.from('day_off').select('day, type').eq('user_id', viewingId).eq('week_start', weekStart),
+          supabase.from('va_task_notes').select('task_id, note').eq('user_id', viewingId).eq('week_start', weekStart),
         ])
         completions = completionData.data ?? []
         customTasksData = customData.data ?? []
         vaLinksData = linkData.data ?? []
         dayOffsData = dayOffData.data ?? []
+        taskNotesData = noteData.data ?? []
       }
 
       const map: Record<string, number> = {}
@@ -275,6 +281,16 @@ export default function TasksPage() {
       setLinkDraft(drafts)
 
       setCustomTasks(customTasksData)
+
+      const notesMap: Record<string, string> = {}
+      taskNotesData.forEach(row => {
+        if (row.task_id > 10000) {
+          notesMap[`custom-${row.task_id - 10000}`] = row.note ?? ''
+        } else {
+          notesMap[String(row.task_id)] = row.note ?? ''
+        }
+      })
+      setTaskNotes(notesMap)
     }
     loadData()
   }, [viewingId, weekStart, selectedMemberId])
@@ -364,6 +380,20 @@ export default function TasksPage() {
     setCustomTasks(prev => prev.filter(t => t.id !== id))
   }
 
+  async function saveTaskNote(taskId: number, note: string) {
+    if (!userId || !!selectedMemberId) return
+    const supabase = createClient()
+    if (note.trim()) {
+      await supabase.from('va_task_notes').upsert(
+        { user_id: userId, task_id: taskId, week_start: weekStart, note, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,task_id,week_start' }
+      )
+    } else {
+      await supabase.from('va_task_notes').delete()
+        .eq('user_id', userId).eq('task_id', taskId).eq('week_start', weekStart)
+    }
+  }
+
   async function generateReport() {
     setGeneratingReport(true)
     setShowReport(true)
@@ -392,6 +422,20 @@ export default function TasksPage() {
     const resolvedName = name.trim() || 'Team Member'
     setReportMeta({ name: resolvedName, weekOf })
 
+    const notesContext = Object.entries(taskNotes)
+      .filter(([, note]) => note.trim())
+      .map(([key, note]) => {
+        if (key.startsWith('custom-')) {
+          const id = parseInt(key.slice(7))
+          const t = customTasks.find(x => x.id === id)
+          return t ? `- ${t.task_name}: "${note.trim()}"` : null
+        }
+        const id = parseInt(key)
+        const t = DEFAULT_TASKS.find(x => x.id === id)
+        return t ? `- ${t.name}: "${note.trim()}"` : null
+      })
+      .filter(Boolean) as string[]
+
     try {
       const res = await fetch('/api/eow-report', {
         method: 'POST',
@@ -403,6 +447,7 @@ export default function TasksPage() {
           weeklyHours,
           dayOffs,
           userId,
+          taskNotes: notesContext,
         }),
       })
       const data = await res.json()
@@ -459,6 +504,36 @@ export default function TasksPage() {
             >
               {savingLink === taskId ? 'Saving...' : 'Save'}
             </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  function NoteSection({ taskKey, taskId }: { taskKey: string; taskId: number }) {
+    const isOpen = expandedNote === taskKey
+    const note = taskNotes[taskKey] ?? ''
+    const hasNote = !!note.trim()
+
+    return (
+      <div className="mt-1">
+        <button
+          onClick={() => setExpandedNote(isOpen ? null : taskKey)}
+          className={`text-xs flex items-center gap-1 transition-colors ${hasNote ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-400'}`}
+        >
+          📝 {hasNote ? 'Notes' : 'Add note'}
+        </button>
+        {isOpen && (
+          <div className="mt-1.5">
+            <textarea
+              value={note}
+              onChange={e => setTaskNotes(prev => ({ ...prev, [taskKey]: e.target.value }))}
+              onBlur={e => saveTaskNote(taskId, e.target.value)}
+              disabled={!!selectedMemberId}
+              placeholder="Flag priority, blockers, or context for your EOW report — e.g. 'Main priority this week', 'Blocked on client response', 'Skipped — meeting overran'"
+              rows={2}
+              className="w-full bg-gray-800/60 border border-gray-700 rounded px-2 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 resize-none"
+            />
           </div>
         )}
       </div>
@@ -624,6 +699,7 @@ export default function TasksPage() {
                           {task.form_link && <a href={task.form_link} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:text-green-300">Submit form →</a>}
                         </div>
                         <LinkSection taskId={task.id} />
+                        <NoteSection taskKey={String(task.id)} taskId={task.id} />
                       </td>
                       <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.time_window}</td>
                       <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
@@ -743,6 +819,7 @@ export default function TasksPage() {
                         <p className="font-medium">{task.task_name}</p>
                         {task.description && <p className="text-xs text-gray-400">{task.description}</p>}
                         <LinkSection taskId={task.id + 10000} />
+                        <NoteSection taskKey={`custom-${task.id}`} taskId={task.id + 10000} />
                       </td>
                       <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
                       {DAYS.map(d => {
@@ -822,6 +899,7 @@ export default function TasksPage() {
                           {task.doc_link && <a href={task.doc_link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">View SOP →</a>}
                           {task.form_link && <a href={task.form_link} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:text-green-300">Submit form →</a>}
                         </div>
+                        <NoteSection taskKey={String(task.id)} taskId={task.id} />
                       </td>
                       <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.time_window}</td>
                       <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
