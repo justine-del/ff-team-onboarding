@@ -221,16 +221,38 @@ export default function TasksPage() {
   useEffect(() => {
     if (!viewingId) return
     async function loadData() {
-      const supabase = createClient()
-      const [completionData, linkData, customData, dayOffData] = await Promise.all([
-        supabase.from('task_completions').select('task_id, day, completed, time_spent').eq('user_id', viewingId).eq('week_start', weekStart),
-        supabase.from('va_task_links').select('task_id, loom_link, sop_doc_link').eq('user_id', viewingId),
-        supabase.from('va_custom_tasks').select('*').eq('user_id', viewingId).eq('active', true),
-        supabase.from('day_off').select('day, type').eq('user_id', viewingId).eq('week_start', weekStart),
-      ])
+      let completions: { task_id: number; day: string; completed: boolean; time_spent: number }[] = []
+      let customTasksData: CustomTask[] = []
+      let vaLinksData: VALink[] = []
+      let dayOffsData: { day: string; type: string }[] = []
+
+      if (selectedMemberId) {
+        // Admin viewing a member — use service-role API to bypass RLS
+        const res = await fetch(`/api/admin/member-tasks?memberId=${selectedMemberId}&weekStart=${weekStart}`)
+        if (res.ok) {
+          const json = await res.json()
+          completions = json.completions
+          customTasksData = json.customTasks
+          vaLinksData = json.vaLinks
+          dayOffsData = json.dayOffs
+        }
+      } else {
+        // Member viewing their own data — direct client queries (RLS: auth.uid() = user_id)
+        const supabase = createClient()
+        const [completionData, linkData, customData, dayOffData] = await Promise.all([
+          supabase.from('task_completions').select('task_id, day, completed, time_spent').eq('user_id', viewingId).eq('week_start', weekStart),
+          supabase.from('va_task_links').select('task_id, loom_link, sop_doc_link').eq('user_id', viewingId),
+          supabase.from('va_custom_tasks').select('*').eq('user_id', viewingId).eq('active', true),
+          supabase.from('day_off').select('day, type').eq('user_id', viewingId).eq('week_start', weekStart),
+        ])
+        completions = completionData.data ?? []
+        customTasksData = customData.data ?? []
+        vaLinksData = linkData.data ?? []
+        dayOffsData = dayOffData.data ?? []
+      }
 
       const map: Record<string, number> = {}
-      completionData.data?.forEach(row => {
+      completions.forEach(row => {
         const mins = row.time_spent ?? (row.completed ? 30 : 0)
         if (row.task_id > 10000) {
           map[`custom-${row.task_id - 10000}-${row.day}`] = mins
@@ -241,21 +263,21 @@ export default function TasksPage() {
       setCompletions(map)
 
       const dayOffMap: Record<string, string> = {}
-      dayOffData.data?.forEach(row => { dayOffMap[row.day] = row.type })
+      dayOffsData.forEach(row => { dayOffMap[row.day] = row.type })
       setDayOffs(dayOffMap)
 
       const links: Record<number, VALink> = {}
-      linkData.data?.forEach(row => { links[row.task_id] = row })
+      vaLinksData.forEach(row => { links[row.task_id] = row })
       setVALinks(links)
 
       const drafts: Record<number, { loom: string, sop: string }> = {}
-      linkData.data?.forEach(row => { drafts[row.task_id] = { loom: row.loom_link ?? '', sop: row.sop_doc_link ?? '' } })
+      vaLinksData.forEach(row => { drafts[row.task_id] = { loom: row.loom_link ?? '', sop: row.sop_doc_link ?? '' } })
       setLinkDraft(drafts)
 
-      setCustomTasks(customData.data ?? [])
+      setCustomTasks(customTasksData)
     }
     loadData()
-  }, [viewingId, weekStart])
+  }, [viewingId, weekStart, selectedMemberId])
 
   async function setTaskTime(taskId: number, day: string, minutes: number) {
     if (!userId || !!selectedMemberId) return
