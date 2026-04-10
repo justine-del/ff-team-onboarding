@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import QuickNav from '@/components/QuickNav'
@@ -159,6 +159,47 @@ function getMonday() {
 }
 
 type Member = { id: string; first_name: string; last_name: string; email: string }
+
+type NoteSectionProps = {
+  taskKey: string
+  taskId: number
+  expandedNote: string | null
+  setExpandedNote: (key: string | null) => void
+  taskNotes: Record<string, string>
+  setTaskNotes: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  saveTaskNote: (taskId: number, note: string) => void
+  disabled: boolean
+}
+
+function NoteSection({ taskKey, taskId, expandedNote, setExpandedNote, taskNotes, setTaskNotes, saveTaskNote, disabled }: NoteSectionProps) {
+  const isOpen = expandedNote === taskKey
+  const note = taskNotes[taskKey] ?? ''
+  const hasNote = !!note.trim()
+
+  return (
+    <div className="mt-1">
+      <button
+        onClick={() => setExpandedNote(isOpen ? null : taskKey)}
+        className={`text-xs flex items-center gap-1 transition-colors ${hasNote ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-400'}`}
+      >
+        📝 {hasNote ? 'Notes' : 'Add note'}
+      </button>
+      {isOpen && (
+        <div className="mt-1.5">
+          <textarea
+            value={note}
+            onChange={e => setTaskNotes(prev => ({ ...prev, [taskKey]: e.target.value }))}
+            onBlur={e => saveTaskNote(taskId, e.target.value)}
+            disabled={disabled}
+            placeholder="Flag priority, blockers, or context for your EOW report — e.g. 'Main priority this week', 'Blocked on client response', 'Skipped — meeting overran'"
+            rows={2}
+            className="w-full bg-gray-800/60 border border-gray-700 rounded px-2 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 resize-none"
+          />
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function TasksPage() {
   const [completions, setCompletions] = useState<Record<string, number>>({})
@@ -510,36 +551,6 @@ export default function TasksPage() {
     )
   }
 
-  function NoteSection({ taskKey, taskId }: { taskKey: string; taskId: number }) {
-    const isOpen = expandedNote === taskKey
-    const note = taskNotes[taskKey] ?? ''
-    const hasNote = !!note.trim()
-
-    return (
-      <div className="mt-1">
-        <button
-          onClick={() => setExpandedNote(isOpen ? null : taskKey)}
-          className={`text-xs flex items-center gap-1 transition-colors ${hasNote ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-400'}`}
-        >
-          📝 {hasNote ? 'Notes' : 'Add note'}
-        </button>
-        {isOpen && (
-          <div className="mt-1.5">
-            <textarea
-              value={note}
-              onChange={e => setTaskNotes(prev => ({ ...prev, [taskKey]: e.target.value }))}
-              onBlur={e => saveTaskNote(taskId, e.target.value)}
-              disabled={!!selectedMemberId}
-              placeholder="Flag priority, blockers, or context for your EOW report — e.g. 'Main priority this week', 'Blocked on client response', 'Skipped — meeting overran'"
-              rows={2}
-              className="w-full bg-gray-800/60 border border-gray-700 rounded px-2 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 resize-none"
-            />
-          </div>
-        )}
-      </div>
-    )
-  }
-
   if (loading) {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">Loading...</div>
   }
@@ -699,7 +710,7 @@ export default function TasksPage() {
                           {task.form_link && <a href={task.form_link} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:text-green-300">Submit form →</a>}
                         </div>
                         <LinkSection taskId={task.id} />
-                        <NoteSection taskKey={String(task.id)} taskId={task.id} />
+                        <NoteSection taskKey={String(task.id)} taskId={task.id} expandedNote={expandedNote} setExpandedNote={setExpandedNote} taskNotes={taskNotes} setTaskNotes={setTaskNotes} saveTaskNote={saveTaskNote} disabled={!!selectedMemberId} />
                       </td>
                       <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.time_window}</td>
                       <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
@@ -819,7 +830,7 @@ export default function TasksPage() {
                         <p className="font-medium">{task.task_name}</p>
                         {task.description && <p className="text-xs text-gray-400">{task.description}</p>}
                         <LinkSection taskId={task.id + 10000} />
-                        <NoteSection taskKey={`custom-${task.id}`} taskId={task.id + 10000} />
+                        <NoteSection taskKey={`custom-${task.id}`} taskId={task.id + 10000} expandedNote={expandedNote} setExpandedNote={setExpandedNote} taskNotes={taskNotes} setTaskNotes={setTaskNotes} saveTaskNote={saveTaskNote} disabled={!!selectedMemberId} />
                       </td>
                       <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
                       {DAYS.map(d => {
@@ -899,7 +910,7 @@ export default function TasksPage() {
                           {task.doc_link && <a href={task.doc_link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">View SOP →</a>}
                           {task.form_link && <a href={task.form_link} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:text-green-300">Submit form →</a>}
                         </div>
-                        <NoteSection taskKey={String(task.id)} taskId={task.id} />
+                        <NoteSection taskKey={String(task.id)} taskId={task.id} expandedNote={expandedNote} setExpandedNote={setExpandedNote} taskNotes={taskNotes} setTaskNotes={setTaskNotes} saveTaskNote={saveTaskNote} disabled={!!selectedMemberId} />
                       </td>
                       <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.time_window}</td>
                       <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
