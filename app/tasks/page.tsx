@@ -616,8 +616,9 @@ export default function TasksPage() {
             {[
               'Tasks are your full responsibility unless stated otherwise.',
               "Complete tasks within the time windows (8am–12pm, 1pm–6pm PHT). Use World Time Buddy.",
-              "If you can't complete a task, message the Founder or Manager immediately.",
+              "If you can't complete a task, message the Founder or Manager immediately — do not leave it blank.",
               'Anything less than the stated process is grounds for performance review.',
+              'Update this sheet daily by end of your day (default deadline: 8 PM EST).',
             ].map((rule, i) => (
               <li key={i} className="text-sm text-blue-200/80 flex gap-2">
                 <span className="font-bold">{i + 1}.</span><span>{rule}</span>
@@ -628,9 +629,17 @@ export default function TasksPage() {
 
         {/* Task Completion Clarity */}
         <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-xl p-3 mb-4">
-          <p className="text-sm text-yellow-200/80">
-            <span className="font-semibold text-yellow-300">Task Completion Clarity:</span> A task is only complete after the Communication Text has been sent (if one is required). Failure to send = grounds for performance review.
-          </p>
+          <div className="space-y-1.5">
+            <p className="text-sm text-yellow-200/80">
+              <span className="font-semibold text-yellow-300">Task Completion Clarity:</span> A task is only complete after the Communication Text has been sent (if one is required). Failure to send = grounds for performance review.
+            </p>
+            <p className="text-sm text-yellow-200/70">
+              <span className="font-semibold text-yellow-300">Didn&apos;t complete a task?</span> Log <span className="font-semibold">0 mins</span> and add a note explaining why — blocked, priorities shifted, already done earlier, etc. <span className="font-semibold text-yellow-300">Past days with nothing logged are invisible to operations</span> and cannot be supported. Logging 0 with a note is always better than leaving it blank.
+            </p>
+            <p className="text-sm text-yellow-200/70">
+              <span className="font-semibold text-yellow-300">EOW Report:</span> Use the <span className="font-semibold">Generate EOW Report</span> button (top right) to create your weekly report. Submit by Monday 5:59pm PHT — reports after that won&apos;t count for the previous week.
+            </p>
+          </div>
         </div>
 
         {/* Weekly Reset & EOW Report Reminder */}
