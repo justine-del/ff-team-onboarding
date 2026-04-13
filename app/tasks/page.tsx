@@ -150,10 +150,13 @@ type VALink = {
 
 function getMonday() {
   const now = new Date()
-  const day = now.getDay()
+  const day = now.getDay()   // local day of week (PHT for PH-based members)
+  const hour = now.getHours() // local hour
+  // Mondays before 6pm PHT still belong to last week — members have until 5:59pm to log
+  const stillLastWeek = day === 1 && hour < 18
   const diff = day === 0 ? -6 : 1 - day
   const monday = new Date(now)
-  monday.setDate(now.getDate() + diff)
+  monday.setDate(now.getDate() + diff + (stillLastWeek ? -7 : 0))
   monday.setHours(0, 0, 0, 0)
   return monday
 }
@@ -635,10 +638,10 @@ export default function TasksPage() {
           <div className="bg-teal-900/20 border border-teal-700/40 rounded-xl p-3 mb-4 flex gap-3 items-start">
             <span className="text-teal-400 text-base mt-0.5">🗓</span>
             <p className="text-sm text-teal-200/80 leading-relaxed">
-              <span className="font-semibold text-teal-300">This sheet resets every Monday.</span>{' '}
-              Your logs from the previous week do not carry over — start fresh each week.{' '}
-              <span className="font-semibold text-teal-300">EOW reports must be submitted Friday through Sunday only.</span>{' '}
-              Reports sent outside that window will not be counted for the week.
+              <span className="font-semibold text-teal-300">This sheet resets every Monday at 6pm PHT.</span>{' '}
+              You can still log last week&apos;s tasks until 5:59pm — after that it starts fresh.{' '}
+              <span className="font-semibold text-teal-300">EOW reports must be submitted by Monday 5:59pm PHT.</span>{' '}
+              Reports submitted after the reset will not be counted for the previous week.
             </p>
           </div>
         )}

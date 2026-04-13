@@ -1,13 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
-// Monday of the current week in PHT (UTC+8), returned as YYYY-MM-DD
+// Monday of the current week in PHT (UTC+8), returned as YYYY-MM-DD.
+// Mondays before 6pm PHT (10am UTC) are still treated as last week —
+// members have until 5:59pm PHT to log and submit their EOW report.
 function getWeekStartPHT(offsetWeeks = 0): string {
   const phtNow = new Date(Date.now() + 8 * 60 * 60 * 1000) // shift to PHT
-  const day = phtNow.getUTCDay() // 0=Sun, 1=Mon, …
+  const day = phtNow.getUTCDay()   // 0=Sun, 1=Mon, …
+  const hour = phtNow.getUTCHours() // hour in PHT
+  const stillLastWeek = day === 1 && hour < 18 // Monday before 6pm PHT
   const diffToMonday = day === 0 ? -6 : 1 - day
   const monday = new Date(phtNow)
-  monday.setUTCDate(phtNow.getUTCDate() + diffToMonday + offsetWeeks * 7)
+  monday.setUTCDate(phtNow.getUTCDate() + diffToMonday + (stillLastWeek ? -7 : 0) + offsetWeeks * 7)
   monday.setUTCHours(0, 0, 0, 0)
   return monday.toISOString().split('T')[0]
 }
@@ -104,11 +108,12 @@ export async function GET(req: NextRequest) {
 
   // ── 6. EOW reports — who didn't submit last week ─────────────────────────
   if (memberList.length > 0) {
-    // EOW reports are created Friday–Sunday of last week.
-    // last_week_start is Monday; Friday is +4 days, next Monday is +7 days.
+    // EOW reports window: last Friday through this Monday 5:59pm PHT (9:59am UTC).
+    // Members have until 5:59pm PHT Monday to submit — after that the sheet resets.
     const lastMon = new Date(lastWeek)
     const lastFri = new Date(lastMon); lastFri.setUTCDate(lastMon.getUTCDate() + 4)
-    const thisMon = new Date(thisWeek)
+    // Cutoff = this Monday at 10:00 UTC (= 6pm PHT)
+    const thisMon = new Date(thisWeek); thisMon.setUTCHours(10, 0, 0, 0)
 
     const { data: lastWeekReports, error: reportsErr } = await supabase
       .from('eow_reports')
