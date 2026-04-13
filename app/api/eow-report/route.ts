@@ -2,9 +2,16 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
 export async function POST(req: NextRequest) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json(
+      { error: 'ANTHROPIC_API_KEY is not configured. Add it to Vercel environment variables.' },
+      { status: 500 }
+    )
+  }
+
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
   try {
     const { memberName, weekOf, tasks, weeklyHours, dayOffs, userId, taskNotes } = await req.json()
 
@@ -41,7 +48,7 @@ export async function POST(req: NextRequest) {
     const goodDays = dayStats.filter(d => d.rate === '100.0' && !d.isOff).map(d => d.day)
     const badDays = dayStats.filter(d => d.completed < d.total && d.total > 0 && !d.isOff).map(d => d.day)
 
-    const offDays = Object.entries(dayOffs as Record<string, string>)
+    const offDays = Object.entries((dayOffs ?? {}) as Record<string, string>)
       .map(([day, type]) => `${day} (${type === 'half' ? 'half day' : 'day off'})`)
       .join(', ')
 
@@ -96,24 +103,31 @@ ${taskNotes?.length ? `\nMember's own task notes (use as supporting context for 
 
     const report = message.content[0].type === 'text' ? message.content[0].text : ''
 
+    // Save report independently — never let a DB failure block report delivery
     if (userId) {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { auth: { autoRefreshToken: false, persistSession: false } }
-      )
-      await supabase.from('eow_reports').insert({
-        user_id: userId,
-        member_name: memberName,
-        week_of: weekOf,
-        report_text: report,
-      })
+      try {
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+          { auth: { autoRefreshToken: false, persistSession: false } }
+        )
+        const { error: saveError } = await supabase.from('eow_reports').insert({
+          user_id: userId,
+          member_name: memberName,
+          week_of: weekOf,
+          report_text: report,
+        })
+        if (saveError) console.error('EOW report save failed:', saveError.message)
+      } catch (saveErr) {
+        console.error('EOW report save threw:', saveErr)
+      }
     }
 
     return NextResponse.json({ report })
   } catch (err) {
-    console.error('EOW report error:', err)
-    return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 })
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('EOW report generation error:', err)
+    return NextResponse.json({ error: `Failed to generate report: ${message}` }, { status: 500 })
   }
 }
 
