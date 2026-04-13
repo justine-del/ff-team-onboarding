@@ -1,17 +1,16 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import Groq from 'groq-sdk'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
-  if (!process.env.GOOGLE_AI_API_KEY) {
+  if (!process.env.GROQ_API_KEY) {
     return NextResponse.json(
-      { error: 'GOOGLE_AI_API_KEY is not configured. Add it to Vercel environment variables.' },
+      { error: 'GROQ_API_KEY is not configured. Add it to Vercel environment variables.' },
       { status: 500 }
     )
   }
 
-  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY)
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
   try {
     const { memberName, weekOf, tasks, weeklyHours, dayOffs, userId, taskNotes } = await req.json()
@@ -96,8 +95,13 @@ Write a professional EOW report using EXACTLY this format and structure:
 Keep the tone professional and honest. Use only the data provided. Do not invent tasks or numbers.
 ${taskNotes?.length ? `\nMember's own task notes (use as supporting context for takeaways and recommendations — do not quote verbatim):\n${(taskNotes as string[]).join('\n')}` : ''}`
 
-    const result = await model.generateContent(prompt)
-    const report = result.response.text()
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 1500,
+      messages: [{ role: 'user', content: prompt }],
+    })
+
+    const report = completion.choices[0]?.message?.content ?? ''
 
     // Save report independently — never let a DB failure block report delivery
     if (userId) {
