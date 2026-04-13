@@ -1,16 +1,17 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.GOOGLE_AI_API_KEY) {
     return NextResponse.json(
-      { error: 'ANTHROPIC_API_KEY is not configured. Add it to Vercel environment variables.' },
+      { error: 'GOOGLE_AI_API_KEY is not configured. Add it to Vercel environment variables.' },
       { status: 500 }
     )
   }
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY)
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
   try {
     const { memberName, weekOf, tasks, weeklyHours, dayOffs, userId, taskNotes } = await req.json()
@@ -95,13 +96,8 @@ Write a professional EOW report using EXACTLY this format and structure:
 Keep the tone professional and honest. Use only the data provided. Do not invent tasks or numbers.
 ${taskNotes?.length ? `\nMember's own task notes (use as supporting context for takeaways and recommendations — do not quote verbatim):\n${(taskNotes as string[]).join('\n')}` : ''}`
 
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1500,
-      messages: [{ role: 'user', content: prompt }],
-    })
-
-    const report = message.content[0].type === 'text' ? message.content[0].text : ''
+    const result = await model.generateContent(prompt)
+    const report = result.response.text()
 
     // Save report independently — never let a DB failure block report delivery
     if (userId) {
@@ -130,14 +126,3 @@ ${taskNotes?.length ? `\nMember's own task notes (use as supporting context for 
     return NextResponse.json({ error: `Failed to generate report: ${message}` }, { status: 500 })
   }
 }
-
-function formatTime(mins: number): string {
-  if (!mins) return '0m'
-  if (mins < 60) return `${mins}m`
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  return m > 0 ? `${h}h${m}m` : `${h}h`
-}
-
-// suppress unused warning
-void formatTime
