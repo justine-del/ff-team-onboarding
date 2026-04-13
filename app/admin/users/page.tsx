@@ -40,7 +40,40 @@ function ResetPasswordButton({ email, onLink }: { email: string; onLink: (link: 
       disabled={loading}
       className="text-xs bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
     >
-      {loading ? 'Generating...' : 'Reset Password'}
+      {loading ? 'Generating...' : 'Reset Link'}
+    </button>
+  )
+}
+
+const DEFAULT_PASSWORD = 'CyborgVA2026!'
+
+function SetDefaultPasswordButton({ email, onDone }: { email: string; onDone: (msg: string) => void }) {
+  const [loading, setLoading] = useState(false)
+
+  async function handle() {
+    if (!confirm(`Set password to "${DEFAULT_PASSWORD}" for ${email}?`)) return
+    setLoading(true)
+    const res = await fetch('/api/set-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: DEFAULT_PASSWORD }),
+    })
+    const result = await res.json()
+    if (result.error) {
+      onDone(`Error: ${result.error}`)
+    } else {
+      onDone(`Password set to: ${DEFAULT_PASSWORD}`)
+    }
+    setLoading(false)
+  }
+
+  return (
+    <button
+      onClick={handle}
+      disabled={loading}
+      className="text-xs bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+    >
+      {loading ? 'Setting...' : 'Set Default Password'}
     </button>
   )
 }
@@ -418,6 +451,7 @@ export default function UsersPage() {
                   >
                     Edit
                   </button>
+                  <SetDefaultPasswordButton email={member.email} onDone={(msg) => { setMessage(msg); setInviteLink('') }} />
                   <ResetPasswordButton email={member.email} onLink={(link) => { setInviteLink(link); setMessage('') }} />
                 </div>
               )}
