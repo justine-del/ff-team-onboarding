@@ -22,17 +22,23 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .single()
 
-  // Fetch completion counts + 8-week stats for charts
+  // Fetch completion counts + 8-week stats for charts.
+  // Must match the client-side getMonday() in tasks page: PHT (UTC+8) users store week_start
+  // as the ISO date of Monday midnight PHT expressed in UTC, which is the previous day (Sunday).
   function getWeekStarts(n: number) {
-    const now = new Date()
-    const day = now.getDay()
+    const PHT = 8 * 60 * 60 * 1000
+    const phtNow = new Date(Date.now() + PHT)
+    const day = phtNow.getUTCDay()
+    const hour = phtNow.getUTCHours()
+    const stillLastWeek = day === 1 && hour < 18 // Monday before 6pm PHT
     const diff = day === 0 ? -6 : 1 - day
-    const monday = new Date(now)
-    monday.setDate(now.getDate() + diff)
-    monday.setHours(0, 0, 0, 0)
+    const mondayPHT = new Date(phtNow)
+    mondayPHT.setUTCDate(phtNow.getUTCDate() + diff + (stillLastWeek ? -7 : 0))
+    mondayPHT.setUTCHours(0, 0, 0, 0)
+    const mondayAsUTC = new Date(mondayPHT.getTime() - PHT) // midnight PHT = 4pm UTC prev day
     return Array.from({ length: n }, (_, i) => {
-      const d = new Date(monday)
-      d.setDate(monday.getDate() - i * 7)
+      const d = new Date(mondayAsUTC)
+      d.setUTCDate(mondayAsUTC.getUTCDate() - i * 7)
       return d.toISOString().split('T')[0]
     })
   }

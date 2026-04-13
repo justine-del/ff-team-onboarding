@@ -21,24 +21,39 @@ type MemberStat = {
 }
 
 function getWeekStarts(n = 4): string[] {
-  const now = new Date()
-  const day = now.getDay()
+  // Must match the client-side getMonday() in the tasks page exactly.
+  // Members are in PHT (UTC+8). The client calls monday.setHours(0,0,0,0) in local PHT
+  // time, then takes monday.toISOString().split('T')[0]. Because PHT midnight = 4pm UTC the
+  // previous day, the stored date string is the Sunday before the PHT Monday (e.g. the PHT
+  // week of April 6 is stored as "2026-04-05"). We replicate that here server-side.
+  const PHT = 8 * 60 * 60 * 1000
+  const phtNow = new Date(Date.now() + PHT) // PHT time expressed as a UTC-shifted value
+  const day = phtNow.getUTCDay()
+  const hour = phtNow.getUTCHours()
+  // Mondays before 6pm PHT still belong to the previous week (grace period for EOW reports)
+  const stillLastWeek = day === 1 && hour < 18
+
   const diff = day === 0 ? -6 : 1 - day
-  const monday = new Date(now)
-  monday.setDate(now.getDate() + diff)
-  monday.setHours(0, 0, 0, 0)
+  const mondayPHT = new Date(phtNow)
+  mondayPHT.setUTCDate(phtNow.getUTCDate() + diff + (stillLastWeek ? -7 : 0))
+  mondayPHT.setUTCHours(0, 0, 0, 0) // midnight PHT in our shifted representation
+
+  // Subtract 8 h to get the actual UTC timestamp for PHT midnight (= Sunday 4pm UTC)
+  const mondayAsUTC = new Date(mondayPHT.getTime() - PHT)
 
   const starts: string[] = []
   for (let i = 0; i < n; i++) {
-    const d = new Date(monday)
-    d.setDate(monday.getDate() - i * 7)
+    const d = new Date(mondayAsUTC)
+    d.setUTCDate(mondayAsUTC.getUTCDate() - i * 7)
     starts.push(d.toISOString().split('T')[0])
   }
   return starts
 }
 
 function isWednesdayOrLater(): boolean {
-  return new Date().getDay() >= 3
+  // Use PHT day of week, not server UTC
+  const phtNow = new Date(Date.now() + 8 * 60 * 60 * 1000)
+  return phtNow.getUTCDay() >= 3
 }
 
 const STATUS_ORDER: Record<StatusType, number> = {
