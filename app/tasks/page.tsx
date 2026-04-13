@@ -664,42 +664,57 @@ export default function TasksPage() {
           <button onClick={goToNextWeek} disabled={isCurrentWeek} className={`px-2 py-1 rounded transition-colors text-lg leading-none ${isCurrentWeek ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white'}`}>→</button>
         </div>
 
-        {/* Core 4 Banner */}
-        <div className="bg-blue-900/30 border border-blue-700/50 rounded-xl p-4 mb-4">
-          <h3 className="font-semibold text-blue-300 mb-2">The Core 4 Rules</h3>
-          <ol className="space-y-1">
-            {[
-              'Tasks are your full responsibility unless stated otherwise.',
-              "Complete tasks within the time windows (8am–12pm, 1pm–6pm PHT). Use World Time Buddy.",
-              "If you can't complete a task, message the Founder or Manager immediately.",
-              'Anything less than the stated process is grounds for performance review.',
-            ].map((rule, i) => (
-              <li key={i} className="text-sm text-blue-200/80 flex gap-2">
-                <span className="font-bold">{i + 1}.</span><span>{rule}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
+        {/* Guidelines (collapsible) */}
+        <div className="mb-4">
+          <button
+            onClick={() => toggleSection('guidelines')}
+            className="w-full flex items-center justify-between bg-gray-800/60 border border-gray-700/60 rounded-xl px-4 py-2.5 hover:bg-gray-800 transition-colors"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="text-sm font-semibold text-gray-200">Guidelines</span>
+              <span className="text-xs font-medium bg-red-900/50 text-red-300 border border-red-700/40 px-2 py-0.5 rounded-full">Must Read</span>
+            </div>
+            <span className="text-gray-500 text-sm">{collapsed['guidelines'] ? '▲' : '▼'}</span>
+          </button>
 
-        {/* Task Completion Clarity */}
-        <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-xl p-3 mb-4">
-          <p className="text-sm text-yellow-200/80">
-            <span className="font-semibold text-yellow-300">Task Completion Clarity:</span> A task is only complete after the Communication Text has been sent (if one is required). Failure to send = grounds for performance review.
-          </p>
-        </div>
+          {collapsed['guidelines'] && (
+            <div className="mt-2 space-y-2">
+              <div className="bg-blue-900/30 border border-blue-700/50 rounded-xl p-4">
+                <h3 className="font-semibold text-blue-300 mb-2">The Core 4 Rules</h3>
+                <ol className="space-y-1">
+                  {[
+                    'Tasks are your full responsibility unless stated otherwise.',
+                    'Complete tasks within the time windows (8am–12pm, 1pm–6pm PHT). Use World Time Buddy.',
+                    "If you can't complete a task, message the Founder or Manager immediately.",
+                    'Anything less than the stated process is grounds for performance review.',
+                  ].map((rule, i) => (
+                    <li key={i} className="text-sm text-blue-200/80 flex gap-2">
+                      <span className="font-bold">{i + 1}.</span><span>{rule}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
 
-        {/* Weekly Reset & EOW Report Reminder */}
-        {!selectedMemberId && (
-          <div className="bg-teal-900/20 border border-teal-700/40 rounded-xl p-3 mb-4 flex gap-3 items-start">
-            <span className="text-teal-400 text-base mt-0.5">🗓</span>
-            <p className="text-sm text-teal-200/80 leading-relaxed">
-              <span className="font-semibold text-teal-300">This sheet resets every Monday at 6pm PHT.</span>{' '}
-              You can still log last week&apos;s tasks until 5:59pm — after that it starts fresh.{' '}
-              <span className="font-semibold text-teal-300">EOW reports must be submitted by Monday 5:59pm PHT.</span>{' '}
-              Reports submitted after the reset will not be counted for the previous week.
-            </p>
-          </div>
-        )}
+              <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-xl p-3">
+                <p className="text-sm text-yellow-200/80">
+                  <span className="font-semibold text-yellow-300">Task Completion Clarity:</span> A task is only complete after the Communication Text has been sent (if one is required). Failure to send = grounds for performance review.
+                </p>
+              </div>
+
+              {!selectedMemberId && (
+                <div className="bg-teal-900/20 border border-teal-700/40 rounded-xl p-3 flex gap-3 items-start">
+                  <span className="text-teal-400 text-base mt-0.5">🗓</span>
+                  <p className="text-sm text-teal-200/80 leading-relaxed">
+                    <span className="font-semibold text-teal-300">This sheet resets every Monday at 6pm PHT.</span>{' '}
+                    You can still log last week&apos;s tasks until 5:59pm — after that it starts fresh.{' '}
+                    <span className="font-semibold text-teal-300">EOW reports must be submitted by Monday 5:59pm PHT.</span>{' '}
+                    Reports submitted after the reset will not be counted for the previous week.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Weekly Hours Summary */}
         <div className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 mb-6">
