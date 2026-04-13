@@ -231,10 +231,23 @@ export default function TasksPage() {
   const toggleSection = (key: string) => setCollapsed(p => ({ ...p, [key]: !p[key] }))
   const [taskNotes, setTaskNotes] = useState<Record<string, string>>({})
   const [expandedNote, setExpandedNote] = useState<string | null>(null)
+  const [pastReports, setPastReports] = useState<{id: number; week_of: string; report_text: string}[]>([])
+  const [selectedReportId, setSelectedReportId] = useState<number | null>(null)
 
-  const monday = getMonday()
+  const [viewingMonday, setViewingMonday] = useState<Date>(() => getMonday())
+  const currentMonday = getMonday()
+  const isCurrentWeek = viewingMonday.toISOString().split('T')[0] === currentMonday.toISOString().split('T')[0]
+  const monday = viewingMonday
   const weekStart = monday.toISOString().split('T')[0]
   const today = new Date().toLocaleDateString('en-US', { weekday: 'short' })
+
+  function goToPrevWeek() {
+    setViewingMonday(d => { const p = new Date(d); p.setDate(d.getDate() - 7); return p })
+  }
+  function goToNextWeek() {
+    if (isCurrentWeek) return
+    setViewingMonday(d => { const n = new Date(d); n.setDate(d.getDate() + 7); return n })
+  }
 
   const viewingId = selectedMemberId ?? userId
 
@@ -340,7 +353,7 @@ export default function TasksPage() {
   }, [viewingId, weekStart, selectedMemberId])
 
   async function setTaskTime(taskId: number, day: string, minutes: number) {
-    if (!userId || !!selectedMemberId) return
+    if (!userId || !!selectedMemberId || !isCurrentWeek) return
     const supabase = createClient()
     const key = taskId > 10000 ? `custom-${taskId - 10000}-${day}` : `${taskId}-${day}`
     const prev = completions[key] ?? 0
@@ -361,7 +374,7 @@ export default function TasksPage() {
 
   // EOW tasks use binary toggle
   async function toggleEOWTask(taskId: number, day: string) {
-    if (!userId || !!selectedMemberId) return
+    if (!userId || !!selectedMemberId || !isCurrentWeek) return
     const supabase = createClient()
     const key = `${taskId}-${day}`
     const current = completions[key] ?? 0
@@ -380,7 +393,7 @@ export default function TasksPage() {
   }
 
   async function toggleDayOff(day: string) {
-    if (!userId || !!selectedMemberId) return
+    if (!userId || !!selectedMemberId || !isCurrentWeek) return
     const supabase = createClient()
     const current = dayOffs[day]
     let next: string | null = null
@@ -425,7 +438,7 @@ export default function TasksPage() {
   }
 
   async function saveTaskNote(taskId: number, note: string) {
-    if (!userId || !!selectedMemberId) return
+    if (!userId || !!selectedMemberId || !isCurrentWeek) return
     const supabase = createClient()
     if (note.trim()) {
       await supabase.from('va_task_notes').upsert(
@@ -496,9 +509,34 @@ export default function TasksPage() {
       })
       const data = await res.json()
       setReportText(data.report ?? data.error ?? 'Error generating report.')
+      setSelectedReportId(null)
     } catch {
       setReportText('Error generating report. Check your API key in Vercel.')
     }
+    setGeneratingReport(false)
+    // Refresh past reports list so the new one appears
+    await loadPastReports(selectedMemberId ?? userId)
+  }
+
+  async function loadPastReports(targetId: string | null) {
+    if (!targetId) return
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('eow_reports')
+      .select('id, week_of, report_text')
+      .eq('user_id', targetId)
+      .order('created_at', { ascending: false })
+      .limit(12)
+    setPastReports(data ?? [])
+  }
+
+  async function openPastReports() {
+    const targetId = selectedMemberId ?? userId
+    setShowReport(true)
+    setReportText('')
+    setSelectedReportId(null)
+    setGeneratingReport(true)
+    await loadPastReports(targetId)
     setGeneratingReport(false)
   }
 
@@ -608,6 +646,23 @@ export default function TasksPage() {
             <button onClick={() => setSaveError(null)} className="ml-4 text-red-400 hover:text-white">✕</button>
           </div>
         )}
+
+        {/* Week Navigator */}
+        <div className="flex items-center justify-between bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2.5 mb-4">
+          <button onClick={goToPrevWeek} className="text-gray-400 hover:text-white px-2 py-1 rounded transition-colors text-lg leading-none">←</button>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-200">
+              Week of {monday.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            </span>
+            {!isCurrentWeek && (
+              <>
+                <span className="text-xs bg-amber-900/40 text-amber-300 border border-amber-700/40 px-2 py-0.5 rounded-full">Read-only</span>
+                <button onClick={() => setViewingMonday(getMonday())} className="text-xs text-purple-400 hover:text-purple-300 transition-colors">Back to current week</button>
+              </>
+            )}
+          </div>
+          <button onClick={goToNextWeek} disabled={isCurrentWeek} className={`px-2 py-1 rounded transition-colors text-lg leading-none ${isCurrentWeek ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white'}`}>→</button>
+        </div>
 
         {/* Core 4 Banner */}
         <div className="bg-blue-900/30 border border-blue-700/50 rounded-xl p-4 mb-4">
