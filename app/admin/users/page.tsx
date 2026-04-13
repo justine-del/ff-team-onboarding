@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 type Member = {
@@ -12,6 +13,7 @@ type Member = {
   job_role: string | null
   start_date: string | null
   role: string
+  company_id: string | null
 }
 
 async function generateLoginLink(email: string): Promise<string | null> {
@@ -59,11 +61,7 @@ function SetDefaultPasswordButton({ email, onDone }: { email: string; onDone: (m
       body: JSON.stringify({ email, password: DEFAULT_PASSWORD }),
     })
     const result = await res.json()
-    if (result.error) {
-      onDone(`Error: ${result.error}`)
-    } else {
-      onDone(`Password set to: ${DEFAULT_PASSWORD}`)
-    }
+    onDone(result.error ? `Error: ${result.error}` : `Password set to: ${DEFAULT_PASSWORD}`)
     setLoading(false)
   }
 
@@ -108,11 +106,7 @@ function EditMemberRow({ member, onSave, onCancel }: {
       })
       .eq('id', member.id)
 
-    if (err) {
-      setError(err.message)
-      setSaving(false)
-      return
-    }
+    if (err) { setError(err.message); setSaving(false); return }
     onSave({ ...member, ...form, job_role: form.job_role || null, start_date: form.start_date || null })
     setSaving(false)
   }
@@ -161,17 +155,15 @@ function EditMemberRow({ member, onSave, onCancel }: {
   )
 }
 
-function LookupRepairPanel({ onRepaired }: { onRepaired: (m: Member, loginLink: string | null) => void }) {
+function LookupRepairPanel({ companyId, onRepaired }: {
+  companyId: string
+  onRepaired: (m: Member, loginLink: string | null) => void
+}) {
   const [email, setEmail] = useState('')
   const [form, setForm] = useState({ first_name: '', last_name: '', job_role: '', start_date: '', role: 'member' })
   const [step, setStep] = useState<'input' | 'fill'>('input')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
-  async function handleLookup(e: React.FormEvent) {
-    e.preventDefault()
-    setStep('fill')
-  }
 
   async function handleRepair(e: React.FormEvent) {
     e.preventDefault()
@@ -180,17 +172,11 @@ function LookupRepairPanel({ onRepaired }: { onRepaired: (m: Member, loginLink: 
     const res = await fetch('/api/repair-profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, ...form }),
+      body: JSON.stringify({ email, ...form, company_id: companyId }),
     })
     const result = await res.json()
-    if (result.error) {
-      setError(result.error)
-      setLoading(false)
-      return
-    }
-    // Also generate a password-reset link so she can log in right away
+    if (result.error) { setError(result.error); setLoading(false); return }
     const loginLink = await generateLoginLink(email)
-    // Reload profile from DB
     const supabase = (await import('@/lib/supabase/client')).createClient()
     const { data } = await supabase.from('profiles').select('*').eq('email', email).single()
     if (data) onRepaired(data, loginLink)
@@ -206,17 +192,16 @@ function LookupRepairPanel({ onRepaired }: { onRepaired: (m: Member, loginLink: 
     <div className="bg-yellow-950/30 border border-yellow-700/50 rounded-xl p-4 mb-6">
       <p className="text-xs text-yellow-300 font-semibold mb-3 uppercase tracking-wide">Find & Repair Missing Profile</p>
       {error && <p className="text-xs text-red-400 mb-2">{error}</p>}
-
       {step === 'input' ? (
-        <form onSubmit={handleLookup} className="flex gap-2">
+        <form onSubmit={e => { e.preventDefault(); setStep('fill') }} className="flex gap-2">
           <input
             type="email" required value={email}
             onChange={e => setEmail(e.target.value)}
             placeholder="Enter member email..."
             className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
           />
-          <button type="submit" disabled={loading}
-            className="text-sm bg-yellow-700 hover:bg-yellow-600 disabled:opacity-50 text-white px-4 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+          <button type="submit"
+            className="text-sm bg-yellow-700 hover:bg-yellow-600 text-white px-4 py-1.5 rounded-lg transition-colors whitespace-nowrap">
             Look Up
           </button>
         </form>
@@ -224,22 +209,10 @@ function LookupRepairPanel({ onRepaired }: { onRepaired: (m: Member, loginLink: 
         <form onSubmit={handleRepair}>
           <p className="text-xs text-gray-400 mb-3">Filling profile for: <span className="text-white">{email}</span></p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">First Name</label>
-              <input value={form.first_name} onChange={e => setForm(p => ({ ...p, first_name: e.target.value }))} className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Last Name</label>
-              <input value={form.last_name} onChange={e => setForm(p => ({ ...p, last_name: e.target.value }))} className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Job Role</label>
-              <input value={form.job_role} onChange={e => setForm(p => ({ ...p, job_role: e.target.value }))} className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Start Date</label>
-              <input type="date" value={form.start_date} onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))} className={inputClass} />
-            </div>
+            <div><label className="block text-xs text-gray-400 mb-1">First Name</label><input value={form.first_name} onChange={e => setForm(p => ({ ...p, first_name: e.target.value }))} className={inputClass} /></div>
+            <div><label className="block text-xs text-gray-400 mb-1">Last Name</label><input value={form.last_name} onChange={e => setForm(p => ({ ...p, last_name: e.target.value }))} className={inputClass} /></div>
+            <div><label className="block text-xs text-gray-400 mb-1">Job Role</label><input value={form.job_role} onChange={e => setForm(p => ({ ...p, job_role: e.target.value }))} className={inputClass} /></div>
+            <div><label className="block text-xs text-gray-400 mb-1">Start Date</label><input type="date" value={form.start_date} onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))} className={inputClass} /></div>
             <div>
               <label className="block text-xs text-gray-400 mb-1">Role</label>
               <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))} className={inputClass}>
@@ -266,40 +239,58 @@ function LookupRepairPanel({ onRepaired }: { onRepaired: (m: Member, loginLink: 
 
 export default function UsersPage() {
   const [members, setMembers] = useState<Member[]>([])
+  const [companyId, setCompanyId] = useState<string | null>(null)
   const [showInviteForm, setShowInviteForm] = useState(false)
   const [form, setForm] = useState({ first_name: '', last_name: '', email: '', job_role: '', start_date: '' })
   const [loading, setLoading] = useState(false)
+  const [pageLoading, setPageLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [inviteLink, setInviteLink] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const router = useRouter()
 
   useEffect(() => {
     async function load() {
       const supabase = createClient()
-      const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, company_id')
+        .eq('id', user.id)
+        .single()
+
+      if (profile?.role !== 'admin' && profile?.role !== 'super_admin') {
+        router.push('/dashboard')
+        return
+      }
+
+      setCompanyId(profile?.company_id ?? null)
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('company_id', profile?.company_id)
+        .order('created_at', { ascending: false })
+
       setMembers(data ?? [])
+      setPageLoading(false)
     }
     load()
-  }, [])
+  }, [router])
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault()
+    if (!companyId) { setMessage('Error: company not found.'); return }
     setLoading(true)
     setMessage('')
-
-    const allowedDomains = ['funnelfuturist.com', 'joburn.com']
-    const emailDomain = form.email.split('@')[1]
-    if (!allowedDomains.includes(emailDomain)) {
-      setMessage(`Email must be a @funnelfuturist.com or @joburn.com address.`)
-      setLoading(false)
-      return
-    }
 
     const res = await fetch('/api/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, company_id: companyId, role: 'member' }),
     })
 
     const result = await res.json()
@@ -310,11 +301,21 @@ export default function UsersPage() {
       setForm({ first_name: '', last_name: '', email: '', job_role: '', start_date: '' })
       setShowInviteForm(false)
       const supabase = createClient()
-      const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false })
       setMembers(data ?? [])
     }
     setLoading(false)
   }
+
+  if (pageLoading) return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">
+      Loading...
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -332,14 +333,16 @@ export default function UsersPage() {
       </nav>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <LookupRepairPanel onRepaired={(m, loginLink) => {
-          setMembers(prev => {
-            const exists = prev.find(x => x.id === m.id)
-            return exists ? prev.map(x => x.id === m.id ? m : x) : [m, ...prev]
-          })
-          if (loginLink) setInviteLink(loginLink)
-          setMessage(`Profile for ${m.email} saved. Share the login link below.`)
-        }} />
+        {companyId && (
+          <LookupRepairPanel companyId={companyId} onRepaired={(m, loginLink) => {
+            setMembers(prev => {
+              const exists = prev.find(x => x.id === m.id)
+              return exists ? prev.map(x => x.id === m.id ? m : x) : [m, ...prev]
+            })
+            if (loginLink) setInviteLink(loginLink)
+            setMessage(`Profile for ${m.email} saved. Share the login link below.`)
+          }} />
+        )}
 
         <input
           type="text"
@@ -386,7 +389,7 @@ export default function UsersPage() {
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Company Email</label>
+                <label className="block text-sm text-gray-400 mb-1">Email</label>
                 <input required type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
@@ -424,10 +427,7 @@ export default function UsersPage() {
               {editingId === member.id ? (
                 <EditMemberRow
                   member={member}
-                  onSave={(updated) => {
-                    setMembers(prev => prev.map(m => m.id === updated.id ? updated : m))
-                    setEditingId(null)
-                  }}
+                  onSave={updated => { setMembers(prev => prev.map(m => m.id === updated.id ? updated : m)); setEditingId(null) }}
                   onCancel={() => setEditingId(null)}
                 />
               ) : (
@@ -437,7 +437,7 @@ export default function UsersPage() {
                     <p className="text-sm text-gray-400">{member.email}</p>
                     {member.job_role && <p className="text-xs text-gray-500">{member.job_role}</p>}
                   </div>
-                  <span className={`px-2 py-0.5 rounded text-xs ${member.role === 'admin' ? 'bg-purple-900/60 text-purple-300' : member.role === 'offboarded' ? 'bg-red-900/60 text-red-300' : 'bg-gray-700 text-gray-300'}`}>
+                  <span className={`px-2 py-0.5 rounded text-xs ${member.role === 'admin' || member.role === 'super_admin' ? 'bg-purple-900/60 text-purple-300' : member.role === 'offboarded' ? 'bg-red-900/60 text-red-300' : 'bg-gray-700 text-gray-300'}`}>
                     {member.role}
                   </span>
                   {member.start_date && (
@@ -451,8 +451,8 @@ export default function UsersPage() {
                   >
                     Edit
                   </button>
-                  <SetDefaultPasswordButton email={member.email} onDone={(msg) => { setMessage(msg); setInviteLink('') }} />
-                  <ResetPasswordButton email={member.email} onLink={(link) => { setInviteLink(link); setMessage('') }} />
+                  <SetDefaultPasswordButton email={member.email} onDone={msg => { setMessage(msg); setInviteLink('') }} />
+                  <ResetPasswordButton email={member.email} onLink={link => { setInviteLink(link); setMessage('') }} />
                 </div>
               )}
             </div>

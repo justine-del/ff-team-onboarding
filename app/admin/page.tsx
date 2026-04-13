@@ -21,6 +21,8 @@ type Member = {
 export default function AdminPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [companyName, setCompanyName] = useState('')
   const router = useRouter()
 
   useEffect(() => {
@@ -29,25 +31,48 @@ export default function AdminPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (profile?.role !== 'admin') { router.push('/dashboard'); return }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, company_id')
+        .eq('id', user.id)
+        .single()
 
+      const role = profile?.role
+      if (role !== 'admin' && role !== 'super_admin') {
+        router.push('/dashboard')
+        return
+      }
+
+      setIsSuperAdmin(role === 'super_admin')
+
+      // Fetch this admin's company name
+      if (profile?.company_id) {
+        const { data: company } = await supabase
+          .from('companies')
+          .select('name')
+          .eq('id', profile.company_id)
+          .single()
+        setCompanyName(company?.name ?? '')
+      }
+
+      // Load members scoped to this admin's company
       const { data: allMembers } = await supabase
         .from('profiles')
         .select('*')
         .eq('role', 'member')
+        .eq('company_id', profile?.company_id)
         .order('created_at', { ascending: false })
 
       if (!allMembers?.length) { setLoading(false); return }
 
-      // Fetch completion counts for all members
       const [p1, p2, sops] = await Promise.all([
         supabase.from('phase1_completion').select('user_id').eq('status', 'done').in('user_id', allMembers.map(m => m.id)),
         supabase.from('lesson_completion').select('user_id').eq('completed', true).in('user_id', allMembers.map(m => m.id)),
         supabase.from('sop_completion').select('user_id').eq('completed', true).in('user_id', allMembers.map(m => m.id)),
       ])
 
-      const count = (data: {user_id: string}[] | null, id: string) => data?.filter(r => r.user_id === id).length ?? 0
+      const count = (data: { user_id: string }[] | null, id: string) =>
+        data?.filter(r => r.user_id === id).length ?? 0
 
       setMembers(allMembers.map(m => ({
         ...m,
@@ -60,16 +85,31 @@ export default function AdminPage() {
     load()
   }, [router])
 
-  if (loading) return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">Loading...</div>
+  if (loading) return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">
+      Loading...
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">← Dashboard</Link>
-          <h1 className="text-lg font-bold">Admin Dashboard</h1>
+          <div>
+            <h1 className="text-lg font-bold">Admin Dashboard</h1>
+            {companyName && <p className="text-xs text-gray-500">{companyName}</p>}
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap justify-end">
+          {isSuperAdmin && (
+            <Link
+              href="/admin/companies"
+              className="text-sm bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              All Clients
+            </Link>
+          )}
           <Link href="/admin/content" className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
             Edit Links
           </Link>
@@ -88,7 +128,9 @@ export default function AdminPage() {
         {!members.length ? (
           <div className="text-center py-12 text-gray-400">
             <p className="mb-4">No team members yet.</p>
-            <Link href="/admin/users" className="text-blue-400 hover:text-blue-300">Invite your first member →</Link>
+            <Link href="/admin/users" className="text-blue-400 hover:text-blue-300">
+              Invite your first member →
+            </Link>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -115,13 +157,19 @@ export default function AdminPage() {
                       {member.start_date ? new Date(member.start_date).toLocaleDateString() : '—'}
                     </td>
                     <td className="py-3 pr-4">
-                      <span className={member.phase1Done === 18 ? 'text-green-400' : 'text-gray-300'}>{member.phase1Done}/18</span>
+                      <span className={member.phase1Done === 18 ? 'text-green-400' : 'text-gray-300'}>
+                        {member.phase1Done}/18
+                      </span>
                     </td>
                     <td className="py-3 pr-4">
-                      <span className={member.phase2Done === 17 ? 'text-green-400' : 'text-gray-300'}>{member.phase2Done}/17</span>
+                      <span className={member.phase2Done === 17 ? 'text-green-400' : 'text-gray-300'}>
+                        {member.phase2Done}/17
+                      </span>
                     </td>
                     <td className="py-3 pr-4">
-                      <span className={member.sopsD === 10 ? 'text-green-400' : 'text-gray-300'}>{member.sopsD}/10</span>
+                      <span className={member.sopsD === 10 ? 'text-green-400' : 'text-gray-300'}>
+                        {member.sopsD}/10
+                      </span>
                     </td>
                   </tr>
                 ))}

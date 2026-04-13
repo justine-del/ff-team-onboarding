@@ -3,7 +3,13 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
-  const { first_name, last_name, email, job_role, start_date } = body
+  const { first_name, last_name, email, job_role, start_date, company_id, role } = body
+
+  if (!company_id) {
+    return NextResponse.json({ error: 'company_id is required' }, { status: 400 })
+  }
+
+  const inviteRole = role === 'admin' ? 'admin' : 'member'
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,32 +32,37 @@ export async function POST(request: NextRequest) {
       email,
       first_name,
       last_name,
-      role: 'member',
+      role: inviteRole,
       job_role: job_role || null,
       start_date: start_date || null,
+      company_id,
     }, { onConflict: 'id' })
   } else {
-    // New user
+    // New user — create auth account
     const { data: createData, error: createError } = await supabase.auth.admin.createUser({
       email,
       email_confirm: true,
+      user_metadata: { first_name, last_name },
     })
     if (createError) {
       return NextResponse.json({ error: createError.message }, { status: 400 })
     }
     userId = createData.user.id
-    await supabase.from('profiles').insert({
+
+    // Upsert the profile (trigger may have already created a partial one)
+    await supabase.from('profiles').upsert({
       id: userId,
       email,
       first_name,
       last_name,
-      role: 'member',
+      role: inviteRole,
       job_role: job_role || null,
       start_date: start_date || null,
-    })
+      company_id,
+    }, { onConflict: 'id' })
   }
 
-  // Generate a password-setup link (no email sent — we return it to admin)
+  // Generate a one-time password-setup link (returned to admin, not emailed)
   const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
     type: 'recovery',
     email,

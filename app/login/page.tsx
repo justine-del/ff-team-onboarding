@@ -12,18 +12,9 @@ export default function LoginPage() {
   const [resetSent, setResetSent] = useState(false)
   const router = useRouter()
 
-  const allowedDomains = ['funnelfuturist.com', 'joburn.com']
-
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-
-    const emailDomain = email.split('@')[1]
-    if (!allowedDomains.includes(emailDomain)) {
-      setError(`This email isn't authorized. Please use your company email.`)
-      return
-    }
-
     setLoading(true)
     const supabase = createClient()
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
@@ -81,7 +72,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="you@joburn.com"
+                placeholder="you@company.com"
                 required
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
