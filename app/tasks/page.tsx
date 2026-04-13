@@ -487,7 +487,7 @@ export default function TasksPage() {
           tasks: allTasks,
           weeklyHours,
           dayOffs,
-          userId,
+          userId: selectedMemberId ?? userId,
           taskNotes: notesContext,
         }),
       })
@@ -629,6 +629,19 @@ export default function TasksPage() {
             <span className="font-semibold text-yellow-300">Task Completion Clarity:</span> A task is only complete after the Communication Text has been sent (if one is required). Failure to send = grounds for performance review.
           </p>
         </div>
+
+        {/* Weekly Reset & EOW Report Reminder */}
+        {!selectedMemberId && (
+          <div className="bg-teal-900/20 border border-teal-700/40 rounded-xl p-3 mb-4 flex gap-3 items-start">
+            <span className="text-teal-400 text-base mt-0.5">🗓</span>
+            <p className="text-sm text-teal-200/80 leading-relaxed">
+              <span className="font-semibold text-teal-300">This sheet resets every Monday.</span>{' '}
+              Your logs from the previous week do not carry over — start fresh each week.{' '}
+              <span className="font-semibold text-teal-300">EOW reports must be submitted Friday through Sunday only.</span>{' '}
+              Reports sent outside that window will not be counted for the week.
+            </p>
+          </div>
+        )}
 
         {/* Weekly Hours Summary */}
         <div className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 mb-6">
