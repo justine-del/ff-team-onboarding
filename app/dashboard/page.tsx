@@ -45,7 +45,10 @@ export default async function DashboardPage() {
   const weekStarts8 = getWeekStarts(8)
   const currentWeek = weekStarts8[0]
 
-  const isAdminUser = profile?.role === 'admin' || profile?.role === 'super_admin'
+  // Company admins land on their team dashboard, not personal onboarding
+  if (profile?.role === 'admin') redirect('/admin')
+
+  const isAdminUser = profile?.role === 'super_admin'
 
   const [phase1, phase2, sops, tasks, weeklyStats, allMembers] = await Promise.all([
     supabase.from('phase1_completion').select('status').eq('user_id', user.id),

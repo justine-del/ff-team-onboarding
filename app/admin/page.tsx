@@ -18,8 +18,28 @@ type Member = {
   sopsD?: number
 }
 
+type EowStatus = {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+  submitted: boolean
+  week_of: string | null
+}
+
+function getCurrentWeekOf(): string {
+  const PHT = 8 * 60 * 60 * 1000
+  const phtNow = new Date(Date.now() + PHT)
+  const day = phtNow.getUTCDay()
+  const diff = day === 0 ? -6 : 1 - day
+  const monday = new Date(phtNow)
+  monday.setUTCDate(phtNow.getUTCDate() + diff)
+  return `${monday.getUTCFullYear()}-${String(monday.getUTCMonth() + 1).padStart(2, '0')}-${String(monday.getUTCDate()).padStart(2, '0')}`
+}
+
 export default function AdminPage() {
   const [members, setMembers] = useState<Member[]>([])
+  const [eowStatuses, setEowStatuses] = useState<EowStatus[]>([])
   const [loading, setLoading] = useState(true)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [companyName, setCompanyName] = useState('')
@@ -65,14 +85,20 @@ export default function AdminPage() {
 
       if (!allMembers?.length) { setLoading(false); return }
 
-      const [p1, p2, sops] = await Promise.all([
-        supabase.from('phase1_completion').select('user_id').eq('status', 'done').in('user_id', allMembers.map(m => m.id)),
-        supabase.from('lesson_completion').select('user_id').eq('completed', true).in('user_id', allMembers.map(m => m.id)),
-        supabase.from('sop_completion').select('user_id').eq('completed', true).in('user_id', allMembers.map(m => m.id)),
+      const memberIds = allMembers.map(m => m.id)
+      const currentWeekOf = getCurrentWeekOf()
+
+      const [p1, p2, sops, eowReports] = await Promise.all([
+        supabase.from('phase1_completion').select('user_id').eq('status', 'done').in('user_id', memberIds),
+        supabase.from('lesson_completion').select('user_id').eq('completed', true).in('user_id', memberIds),
+        supabase.from('sop_completion').select('user_id').eq('completed', true).in('user_id', memberIds),
+        supabase.from('eow_reports').select('user_id, week_of').eq('week_of', currentWeekOf).in('user_id', memberIds),
       ])
 
       const count = (data: { user_id: string }[] | null, id: string) =>
         data?.filter(r => r.user_id === id).length ?? 0
+
+      const submittedIds = new Set(eowReports.data?.map(r => r.user_id) ?? [])
 
       setMembers(allMembers.map(m => ({
         ...m,
@@ -80,6 +106,16 @@ export default function AdminPage() {
         phase2Done: count(p2.data, m.id),
         sopsD: count(sops.data, m.id),
       })))
+
+      setEowStatuses(allMembers.map(m => ({
+        id: m.id,
+        first_name: m.first_name,
+        last_name: m.last_name,
+        email: m.email,
+        submitted: submittedIds.has(m.id),
+        week_of: currentWeekOf,
+      })))
+
       setLoading(false)
     }
     load()
@@ -175,6 +211,42 @@ export default function AdminPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* EOW Report Status */}
+        {eowStatuses.length > 0 && (
+          <div className="mt-10">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">EOW Report Status</h2>
+              <span className="text-xs text-gray-500">Week of {eowStatuses[0]?.week_of ?? ''}</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-left">
+                    <th className="py-3 pr-4 text-gray-400 font-medium">Name</th>
+                    <th className="py-3 pr-4 text-gray-400 font-medium">Email</th>
+                    <th className="py-3 pr-4 text-gray-400 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {eowStatuses.map(s => (
+                    <tr key={s.id} className="border-b border-gray-800/50 hover:bg-gray-900/50">
+                      <td className="py-3 pr-4 font-medium">{s.first_name} {s.last_name}</td>
+                      <td className="py-3 pr-4 text-gray-400">{s.email}</td>
+                      <td className="py-3 pr-4">
+                        {s.submitted ? (
+                          <span className="text-green-400 text-xs font-medium">✓ Submitted</span>
+                        ) : (
+                          <span className="text-red-400 text-xs font-medium">✗ Not submitted</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </main>

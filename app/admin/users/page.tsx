@@ -76,6 +76,33 @@ function SetDefaultPasswordButton({ email, onDone }: { email: string; onDone: (m
   )
 }
 
+function ResetProgressButton({ userId, name, onDone }: { userId: string; name: string; onDone: (msg: string) => void }) {
+  const [loading, setLoading] = useState(false)
+
+  async function handle() {
+    if (!confirm(`Reset ALL onboarding progress for ${name || 'this member'}? This cannot be undone.`)) return
+    setLoading(true)
+    const res = await fetch('/api/reset-progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
+    })
+    const result = await res.json()
+    onDone(result.error ? `Error: ${result.error}` : `Progress reset for ${name}.`)
+    setLoading(false)
+  }
+
+  return (
+    <button
+      onClick={handle}
+      disabled={loading}
+      className="text-xs bg-orange-900/60 hover:bg-orange-900 disabled:opacity-50 text-orange-300 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+    >
+      {loading ? 'Resetting...' : 'Reset Progress'}
+    </button>
+  )
+}
+
 function EditMemberRow({ member, onSave, onCancel }: {
   member: Member
   onSave: (updated: Member) => void
@@ -453,6 +480,7 @@ export default function UsersPage() {
                   </button>
                   <SetDefaultPasswordButton email={member.email} onDone={msg => { setMessage(msg); setInviteLink('') }} />
                   <ResetPasswordButton email={member.email} onLink={link => { setInviteLink(link); setMessage('') }} />
+                  <ResetProgressButton userId={member.id} name={member.first_name} onDone={msg => { setMessage(msg); setInviteLink('') }} />
                 </div>
               )}
             </div>
