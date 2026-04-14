@@ -236,7 +236,10 @@ export default function TasksPage() {
 
   const [viewingMonday, setViewingMonday] = useState<Date>(() => getMonday())
   const currentMonday = getMonday()
+  const lastMonday = new Date(currentMonday); lastMonday.setDate(currentMonday.getDate() - 7)
   const isCurrentWeek = viewingMonday.toISOString().split('T')[0] === currentMonday.toISOString().split('T')[0]
+  const isLastWeek = viewingMonday.toISOString().split('T')[0] === lastMonday.toISOString().split('T')[0]
+  const isEditableWeek = isCurrentWeek || isLastWeek
   const monday = viewingMonday
   const weekStart = monday.toISOString().split('T')[0]
   const today = new Date().toLocaleDateString('en-US', { weekday: 'short' })
@@ -353,7 +356,7 @@ export default function TasksPage() {
   }, [viewingId, weekStart, selectedMemberId])
 
   async function setTaskTime(taskId: number, day: string, minutes: number) {
-    if (!userId || !!selectedMemberId || !isCurrentWeek) return
+    if (!userId || !!selectedMemberId || !isEditableWeek) return
     const supabase = createClient()
     const key = taskId > 10000 ? `custom-${taskId - 10000}-${day}` : `${taskId}-${day}`
     const prev = completions[key] ?? 0
@@ -374,7 +377,7 @@ export default function TasksPage() {
 
   // EOW tasks use binary toggle
   async function toggleEOWTask(taskId: number, day: string) {
-    if (!userId || !!selectedMemberId || !isCurrentWeek) return
+    if (!userId || !!selectedMemberId || !isEditableWeek) return
     const supabase = createClient()
     const key = `${taskId}-${day}`
     const current = completions[key] ?? 0
@@ -393,7 +396,7 @@ export default function TasksPage() {
   }
 
   async function toggleDayOff(day: string) {
-    if (!userId || !!selectedMemberId || !isCurrentWeek) return
+    if (!userId || !!selectedMemberId || !isEditableWeek) return
     const supabase = createClient()
     const current = dayOffs[day]
     let next: string | null = null
@@ -438,7 +441,7 @@ export default function TasksPage() {
   }
 
   async function saveTaskNote(taskId: number, note: string) {
-    if (!userId || !!selectedMemberId || !isCurrentWeek) return
+    if (!userId || !!selectedMemberId || !isEditableWeek) return
     const supabase = createClient()
     if (note.trim()) {
       await supabase.from('va_task_notes').upsert(
@@ -656,7 +659,9 @@ export default function TasksPage() {
             </span>
             {!isCurrentWeek && (
               <>
-                <span className="text-xs bg-amber-900/40 text-amber-300 border border-amber-700/40 px-2 py-0.5 rounded-full">Read-only</span>
+                {!isEditableWeek && (
+                  <span className="text-xs bg-amber-900/40 text-amber-300 border border-amber-700/40 px-2 py-0.5 rounded-full">Read-only</span>
+                )}
                 <button onClick={() => setViewingMonday(getMonday())} className="text-xs text-purple-400 hover:text-purple-300 transition-colors">Back to current week</button>
               </>
             )}
