@@ -66,7 +66,7 @@ export default function OffboardingPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('role, company_id').eq('id', user.id).single()
-      if (profile?.role !== 'admin') { router.push('/dashboard'); return }
+      if (profile?.role !== 'admin' && profile?.role !== 'super_admin') { router.push('/dashboard'); return }
       const { data } = await supabase.from('profiles').select('*').eq('company_id', profile?.company_id).eq('role', 'member').order('first_name')
       setVAs(data ?? [])
     }
