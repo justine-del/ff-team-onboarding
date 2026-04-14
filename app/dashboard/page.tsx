@@ -3,6 +3,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import MemberStats from '@/components/MemberStats'
+import VAOffboardingForm from '@/components/VAOffboardingForm'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -48,55 +49,14 @@ export default async function DashboardPage() {
   // Company admins land on their team dashboard, not personal onboarding
   if (profile?.role === 'admin') redirect('/admin')
 
-  // VA is in the offboarding process — show checklist instead of normal dashboard
+  // VA is in the offboarding process — show their fillable form
   if (profile?.role === 'offboarding') {
-    return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
-        <div className="max-w-lg w-full">
-          <div className="bg-gray-900 border border-orange-800/40 rounded-2xl p-8">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-orange-900/60 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-orange-400 text-lg">📋</span>
-              </div>
-              <div>
-                <h1 className="text-xl font-bold">Your Offboarding Has Been Initiated</h1>
-                <p className="text-sm text-gray-400">Hey {profile?.first_name ?? 'there'} — your contract is coming to an end.</p>
-              </div>
-            </div>
-
-            <p className="text-sm text-gray-400 mb-5">Please complete the steps below before your last day and hand off to Justine.</p>
-
-            <div className="space-y-2 mb-6">
-              {[
-                { owner: 'YOU', text: 'Complete your task sheet for your final week' },
-                { owner: 'YOU', text: 'Tell Justine your last project worked on and which SOPs you used' },
-                { owner: 'YOU', text: 'Calculate your invoice based on deliverables actually completed — cross-check against your Geekbot standups' },
-                { owner: 'YOU', text: 'Prepare your invoice using the Cyborg VA Invoice Template and send to accounting@joburn.com' },
-                { owner: 'YOU', text: 'Document and hand off all pending work — list items and new owner' },
-                { owner: 'YOU', text: 'Archive your Geekbot standup history for your own records' },
-                { owner: 'JUSTINE', text: 'KPI review, tool access revocation, and final sign-off' },
-              ].map(({ owner, text }, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-medium mt-0.5 ${owner === 'YOU' ? 'bg-orange-900/60 text-orange-400' : 'bg-teal-900/60 text-teal-400'}`}>
-                    {owner}
-                  </span>
-                  <span className="text-sm text-gray-300">{text}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="bg-gray-800/60 rounded-lg p-4 text-sm text-gray-400 mb-6">
-              <p className="font-medium text-gray-300 mb-1">Invoice goes to:</p>
-              <p className="text-white font-mono">accounting@joburn.com</p>
-            </div>
-
-            <form action="/auth/signout" method="post" className="text-center">
-              <button className="text-sm text-gray-500 hover:text-gray-400">Sign out</button>
-            </form>
-          </div>
-        </div>
-      </div>
-    )
+    const { data: offboardingData } = await admin
+      .from('va_offboarding')
+      .select('last_project, sops_used, reason, invoice_period, invoice_amount, invoice_notes, va_submitted')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    return <VAOffboardingForm firstName={profile?.first_name ?? 'there'} existing={offboardingData} />
   }
 
   const isAdminUser = profile?.role === 'super_admin'

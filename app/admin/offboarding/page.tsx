@@ -29,7 +29,8 @@ const emptyForm = {
 type Form = typeof emptyForm
 
 const REASONS: Record<string, string> = {
-  contract_end: 'Contract End', performance: 'Performance', voluntary: 'Voluntary Resignation', other: 'Other'
+  contract_end: 'Contract End', performance: 'Performance',
+  voluntary: 'Voluntary Resignation', other: 'Other'
 }
 
 const INV_STATUS: Record<string, string> = {
@@ -52,14 +53,6 @@ function Check({ checked }: { checked: boolean }) {
   return <span className={checked ? 'text-green-600 font-bold' : 'text-red-500'}>{checked ? '✓' : '✗'}</span>
 }
 
-function AdminBadge() {
-  return <span className="text-xs bg-teal-900/60 text-teal-400 border border-teal-800/60 px-2 py-0.5 rounded font-normal normal-case tracking-normal">ADMIN</span>
-}
-
-function VABadge() {
-  return <span className="text-xs bg-yellow-900/60 text-yellow-400 border border-yellow-800/60 px-2 py-0.5 rounded font-normal normal-case tracking-normal">FROM VA</span>
-}
-
 export default function OffboardingPage() {
   const [vas, setVAs] = useState<VA[]>([])
   const [selectedVA, setSelectedVA] = useState<VA | null>(null)
@@ -67,13 +60,16 @@ export default function OffboardingPage() {
   const [kpiLoading, setKpiLoading] = useState(false)
   const [form, setForm] = useState<Form>(emptyForm)
   const [view, setView] = useState<'form' | 'report'>('form')
-  const [disabling, setDisabling] = useState(false)
-  const [disabled, setDisabled] = useState(false)
-  const [initiating, setInitiating] = useState(false)
+  const [completing, setCompleting] = useState(false)
+  const [completed, setCompleted] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [vaSubmitted, setVASubmitted] = useState(false)
   const router = useRouter()
 
   const initiated = selectedVA?.role === 'offboarding'
-  const currentStep = !selectedVA ? 0 : !initiated ? 1 : disabled ? 3 : 2
+  // Step: 1 = admin hasn't saved yet, 2 = VA's turn, 3 = done
+  const currentStep = !selectedVA ? 0 : completed ? 3 : initiated ? (vaSubmitted ? 3 : 2) : 1
 
   useEffect(() => {
     async function load() {
@@ -94,14 +90,20 @@ export default function OffboardingPage() {
   async function selectVA(va: VA) {
     setSelectedVA(va)
     setKpi(null)
-    setDisabled(false)
+    setCompleted(false)
+    setVASubmitted(false)
+    setSavedAt(null)
+    setForm(emptyForm)
     setKpiLoading(true)
+
     const supabase = createClient()
-    const [p1res, tcres, ctres] = await Promise.all([
+    const [p1res, tcres, ctres, offboardRes] = await Promise.all([
       supabase.from('phase1_completion').select('id').eq('user_id', va.id).eq('status', 'done'),
       supabase.from('task_completions').select('week_start, time_spent').eq('user_id', va.id),
       supabase.from('va_custom_tasks').select('task_name').eq('user_id', va.id).eq('active', true),
+      supabase.from('va_offboarding').select('*').eq('user_id', va.id).maybeSingle(),
     ])
+
     const tcRows = tcres.data ?? []
     const weeksActive = new Set(tcRows.filter(r => (r.time_spent ?? 0) > 0).map(r => r.week_start)).size
     const totalHours = Math.round(tcRows.reduce((s, r) => s + (r.time_spent ?? 0), 0) / 60 * 10) / 10
@@ -111,44 +113,91 @@ export default function OffboardingPage() {
       customTasks: (ctres.data ?? []).map(r => r.task_name),
     }
     setKpi(kpiData)
-    setForm(f => ({
-      ...f,
-      kpi_phase1: String(kpiData.phase1Done),
-      kpi_hours: String(kpiData.totalHours),
-      kpi_weeks: String(kpiData.weeksActive),
-    }))
+
+    const ob = offboardRes.data
+    if (ob) {
+      setVASubmitted(ob.va_submitted ?? false)
+      setForm({
+        last_day: ob.last_day ?? '',
+        reason: ob.reason ?? 'contract_end',
+        offboard_notes: ob.offboard_notes ?? '',
+        last_project: ob.last_project ?? '',
+        sops_used: ob.sops_used ?? '',
+        kpi_summary: ob.kpi_summary ?? '',
+        kpi_phase1: ob.kpi_phase1 || String(kpiData.phase1Done),
+        kpi_hours: ob.kpi_hours || String(kpiData.totalHours),
+        kpi_weeks: ob.kpi_weeks || String(kpiData.weeksActive),
+        invoice_period: ob.invoice_period ?? '',
+        invoice_amount: ob.invoice_amount ?? '',
+        invoice_status: ob.invoice_status ?? 'pending',
+        invoice_notes: ob.invoice_notes ?? '',
+        slack_removed: ob.slack_removed ?? false,
+        drive_removed: ob.drive_removed ?? false,
+        email_deactivated: ob.email_deactivated ?? false,
+        ghl_removed: ob.ghl_removed ?? false,
+        notion_removed: ob.notion_removed ?? false,
+        geekbot_removed: ob.geekbot_removed ?? false,
+        onepw_removed: ob.onepw_removed ?? false,
+        other_tools: ob.other_tools ?? '',
+        handoff_tasks: ob.handoff_tasks ?? '',
+        handoff_docs: ob.handoff_docs ?? '',
+        replacement_needed: ob.replacement_needed ?? false,
+        notify_stakeholders: ob.notify_stakeholders ?? false,
+        final_notes: ob.final_notes ?? '',
+      })
+    } else {
+      setForm(f => ({
+        ...f,
+        kpi_phase1: String(kpiData.phase1Done),
+        kpi_hours: String(kpiData.totalHours),
+        kpi_weeks: String(kpiData.weeksActive),
+      }))
+    }
+
     setKpiLoading(false)
   }
 
   function set(field: keyof Form, val: string | boolean) {
     setForm(f => ({ ...f, [field]: val }))
+    setSavedAt(null)
   }
 
-  async function handleInitiate() {
+  async function handleSave() {
     if (!selectedVA) return
-    setInitiating(true)
-    const res = await fetch('/api/offboard/initiate', {
+    setSaving(true)
+    const res = await fetch('/api/offboard/save', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: selectedVA.id }),
+      body: JSON.stringify({ userId: selectedVA.id, ...form }),
     })
     const data = await res.json()
     if (data.success) {
-      setSelectedVA({ ...selectedVA, role: 'offboarding' })
-      setVAs(vas.map(v => v.id === selectedVA.id ? { ...v, role: 'offboarding' } : v))
+      setSavedAt(new Date().toLocaleTimeString())
+      // If VA was still 'member', update local state to reflect they're now notified
+      if (selectedVA.role === 'member') {
+        const updated = { ...selectedVA, role: 'offboarding' }
+        setSelectedVA(updated)
+        setVAs(vas.map(v => v.id === selectedVA.id ? updated : v))
+      }
     }
-    setInitiating(false)
+    setSaving(false)
   }
 
-  async function handleDisable() {
+  async function handleComplete() {
     if (!selectedVA) return
-    setDisabling(true)
+    setCompleting(true)
+    // Save latest form state first
+    await fetch('/api/offboard/save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: selectedVA.id, ...form }),
+    })
+    // Disable login
     const res = await fetch('/api/offboard', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: selectedVA.id }),
     })
     const data = await res.json()
-    if (data.success) setDisabled(true)
-    setDisabling(false)
+    if (data.success) setCompleted(true)
+    setCompleting(false)
   }
 
   const inputClass = 'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
@@ -161,30 +210,27 @@ export default function OffboardingPage() {
     return (
       <div className="min-h-screen bg-gray-100 text-gray-900">
         <style>{`@media print { .no-print { display: none !important; } body { background: white !important; } }`}</style>
-
         <div className="no-print bg-gray-900 text-white px-6 py-3 flex items-center gap-4 sticky top-0 z-10">
           <button onClick={() => setView('form')} className="text-sm text-gray-400 hover:text-white">← Edit Form</button>
           <button onClick={() => window.print()} className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Print / Save PDF</button>
-          {!disabled ? (
-            <button onClick={handleDisable} disabled={disabling} className="text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg ml-auto">
-              {disabling ? 'Completing...' : 'Complete Offboarding'}
+          {!completed ? (
+            <button onClick={handleComplete} disabled={completing} className="text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg ml-auto">
+              {completing ? 'Completing...' : 'Complete Offboarding'}
             </button>
           ) : (
             <span className="text-green-400 text-sm ml-auto">✓ Offboarding complete</span>
           )}
         </div>
-
         <div className="max-w-4xl mx-auto px-8 py-10 bg-white shadow-lg my-6">
           <div className="border-b-2 border-teal-700 pb-4 mb-6">
             <div className="bg-teal-700 text-white px-4 py-2 rounded-t text-lg font-bold">CYBORG VA — OFFBOARDING REPORT</div>
             <div className="mt-3 flex flex-wrap gap-6 text-sm text-gray-600">
               <span><strong>Prepared:</strong> {today()}</span>
               <span><strong>Processed by:</strong> Justine</span>
-              <span><strong>Status:</strong> {disabled ? '🔴 Login Disabled' : initiated ? '🟡 In Progress' : '⚪ Initiated'}</span>
+              <span><strong>Status:</strong> {completed ? '🔴 Login Disabled' : '🟡 In Progress'}</span>
             </div>
           </div>
 
-          {/* 1. VA Info */}
           <section className="mb-6">
             <h2 className="font-bold text-teal-700 border-b border-teal-200 pb-1 mb-3">1. VA INFORMATION</h2>
             <table className="w-full text-sm border-collapse">
@@ -210,7 +256,6 @@ export default function OffboardingPage() {
             {form.offboard_notes && <p className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded"><strong>Notes:</strong> {form.offboard_notes}</p>}
           </section>
 
-          {/* 2. KPI */}
           <section className="mb-6">
             <h2 className="font-bold text-teal-700 border-b border-teal-200 pb-1 mb-3">2. KPI & WORK REVIEW</h2>
             <table className="w-full text-sm border-collapse mb-3">
@@ -228,18 +273,10 @@ export default function OffboardingPage() {
                 ))}
               </tbody>
             </table>
-            {kpi?.customTasks.length ? (
-              <p className="text-sm text-gray-600 mb-3"><strong>Custom Tasks Assigned:</strong> {kpi.customTasks.join(', ')}</p>
-            ) : null}
-            {form.kpi_summary && (
-              <div className="bg-gray-50 border border-gray-200 rounded p-3 text-sm">
-                <strong className="block mb-1">Performance Summary</strong>
-                <p className="text-gray-700">{form.kpi_summary}</p>
-              </div>
-            )}
+            {kpi?.customTasks.length ? <p className="text-sm text-gray-600 mb-3"><strong>Custom Tasks:</strong> {kpi.customTasks.join(', ')}</p> : null}
+            {form.kpi_summary && <div className="bg-gray-50 border border-gray-200 rounded p-3 text-sm"><strong className="block mb-1">Performance Summary</strong><p className="text-gray-700">{form.kpi_summary}</p></div>}
           </section>
 
-          {/* 3. Invoice */}
           <section className="mb-6">
             <h2 className="font-bold text-teal-700 border-b border-teal-200 pb-1 mb-3">3. FINAL INVOICE</h2>
             <table className="w-full text-sm border-collapse">
@@ -261,12 +298,11 @@ export default function OffboardingPage() {
             {form.invoice_notes && <p className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded"><strong>Notes:</strong> {form.invoice_notes}</p>}
           </section>
 
-          {/* 4. Tool Access */}
           <section className="mb-6">
             <h2 className="font-bold text-teal-700 border-b border-teal-200 pb-1 mb-3">4. TOOL ACCESS REVOCATION</h2>
             <table className="w-full text-sm border-collapse">
               <tbody>
-                {[
+                {([
                   ['Slack', form.slack_removed],
                   ['Google Drive / Shared Folders', form.drive_removed],
                   ['Email Deactivated', form.email_deactivated],
@@ -274,11 +310,11 @@ export default function OffboardingPage() {
                   ['Notion', form.notion_removed],
                   ['Geekbot', form.geekbot_removed],
                   ['1Password', form.onepw_removed],
-                  ['Portal Login', disabled],
-                ].map(([label, val]) => (
-                  <tr key={String(label)} className="border-b border-gray-100">
+                  ['Portal Login', completed],
+                ] as [string, boolean][]).map(([label, val]) => (
+                  <tr key={label} className="border-b border-gray-100">
                     <td className="py-2 pr-4 text-gray-600 w-64">{label}</td>
-                    <td className="py-2"><Check checked={val as boolean} /></td>
+                    <td className="py-2"><Check checked={val} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -286,7 +322,6 @@ export default function OffboardingPage() {
             {form.other_tools && <p className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded"><strong>Other:</strong> {form.other_tools}</p>}
           </section>
 
-          {/* 5. Handoff */}
           <section className="mb-6">
             <h2 className="font-bold text-teal-700 border-b border-teal-200 pb-1 mb-3">5. HANDOFF & CLOSE OUT</h2>
             <table className="w-full text-sm border-collapse">
@@ -325,12 +360,19 @@ export default function OffboardingPage() {
         </div>
         {selectedVA && (
           <div className="flex items-center gap-3">
-            {initiated && !disabled && (
-              <button onClick={handleDisable} disabled={disabling} className="text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg">
-                {disabling ? 'Completing...' : 'Complete Offboarding'}
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="text-sm bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg"
+            >
+              {saving ? 'Saving...' : savedAt ? `Saved ${savedAt}` : 'Save Progress'}
+            </button>
+            {initiated && !completed && (
+              <button onClick={handleComplete} disabled={completing} className="text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg">
+                {completing ? 'Completing...' : 'Complete Offboarding'}
               </button>
             )}
-            {disabled && <span className="text-green-400 text-sm">✓ Offboarding complete</span>}
+            {completed && <span className="text-green-400 text-sm">✓ Done</span>}
             <button onClick={() => setView('report')} className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
               Preview Report →
             </button>
@@ -364,13 +406,13 @@ export default function OffboardingPage() {
           <>
             {/* Step Indicator */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-4">
-              <div className="flex items-center gap-1">
+              <div className="flex items-center">
                 {/* Step 1 */}
                 <div className={`flex items-center gap-2 ${currentStep === 1 ? 'text-white' : currentStep > 1 ? 'text-green-400' : 'text-gray-600'}`}>
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${currentStep === 1 ? 'bg-blue-600' : currentStep > 1 ? 'bg-green-600' : 'bg-gray-800'}`}>
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${currentStep === 1 ? 'bg-blue-600' : 'bg-green-600'}`}>
                     {currentStep > 1 ? '✓' : '1'}
                   </span>
-                  <span className="text-sm font-medium whitespace-nowrap">Admin Initiates</span>
+                  <span className="text-sm font-medium whitespace-nowrap">Admin Saves</span>
                 </div>
                 <div className="flex-1 h-px bg-gray-700 mx-3" />
                 {/* Step 2 */}
@@ -378,7 +420,7 @@ export default function OffboardingPage() {
                   <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${currentStep === 2 ? 'bg-blue-600' : currentStep > 2 ? 'bg-green-600' : 'bg-gray-800'}`}>
                     {currentStep > 2 ? '✓' : '2'}
                   </span>
-                  <span className="text-sm font-medium whitespace-nowrap">VA Completes Checklist</span>
+                  <span className="text-sm font-medium whitespace-nowrap">VA Submits</span>
                 </div>
                 <div className="flex-1 h-px bg-gray-700 mx-3" />
                 {/* Step 3 */}
@@ -386,37 +428,32 @@ export default function OffboardingPage() {
                   <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${currentStep === 3 ? 'bg-green-600' : 'bg-gray-800'}`}>
                     {currentStep === 3 ? '✓' : '3'}
                   </span>
-                  <span className="text-sm font-medium whitespace-nowrap">Admin Closes Out</span>
+                  <span className="text-sm font-medium whitespace-nowrap">Admin Finalizes</span>
                 </div>
               </div>
 
-              {currentStep === 1 && (
-                <div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between gap-4">
-                  <p className="text-xs text-gray-400">Click Initiate to notify the VA — they'll see their offboarding checklist on their dashboard and know what to prepare.</p>
-                  <button onClick={handleInitiate} disabled={initiating} className="text-sm bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg whitespace-nowrap flex-shrink-0">
-                    {initiating ? 'Initiating...' : 'Initiate Offboarding →'}
-                  </button>
-                </div>
-              )}
-              {currentStep === 2 && (
-                <p className="mt-3 pt-3 border-t border-gray-800 text-xs text-yellow-400">
-                  VA has been notified. They can see their offboarding checklist on their dashboard. Fill out the sections below, then click "Complete Offboarding" when ready to disable their login.
-                </p>
-              )}
-              {currentStep === 3 && (
-                <p className="mt-3 pt-3 border-t border-gray-800 text-xs text-green-400">
-                  Offboarding complete. Login has been disabled.
-                </p>
-              )}
+              <div className="mt-3 pt-3 border-t border-gray-800 text-xs">
+                {currentStep === 1 && (
+                  <p className="text-gray-400">Fill in the admin sections below, then click <strong className="text-white">Save Progress</strong>. This will notify the VA to fill out their portion on their dashboard.</p>
+                )}
+                {currentStep === 2 && !vaSubmitted && (
+                  <p className="text-yellow-400/80">VA has been notified and can see their form. Waiting for them to submit their portion. You can continue filling in the admin sections below.</p>
+                )}
+                {currentStep === 2 && vaSubmitted && (
+                  <p className="text-green-400">VA has submitted their portion. Review the form below, then click <strong>Complete Offboarding</strong> to disable their login.</p>
+                )}
+                {currentStep === 3 && (
+                  <p className="text-green-400">Offboarding complete. Login has been disabled.</p>
+                )}
+              </div>
             </div>
 
             {/* 1. VA Information */}
             <div className={cardClass}>
               <div className="flex items-center gap-2 mb-4">
                 <p className="text-sm font-semibold text-gray-300 uppercase tracking-wide">1. VA Information</p>
-                <AdminBadge />
+                <span className="text-xs bg-teal-900/60 text-teal-400 border border-teal-800/60 px-2 py-0.5 rounded">ADMIN</span>
               </div>
-
               <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                 <div><span className="text-gray-400">Name:</span> <span>{selectedVA.first_name} {selectedVA.last_name}</span></div>
                 <div><span className="text-gray-400">Email:</span> <span>{selectedVA.email}</span></div>
@@ -435,16 +472,16 @@ export default function OffboardingPage() {
                   </select>
                 </div>
               </div>
-              <div className="mb-4">
+              <div>
                 <label className={labelClass}>Offboarding Notes</label>
                 <textarea className={inputClass} rows={2} value={form.offboard_notes} onChange={e => set('offboard_notes', e.target.value)} placeholder="Context, red flags, additional details..." />
               </div>
 
-              {/* VA-filled section */}
-              <div className="border-t border-gray-800 pt-4 mt-2">
+              {/* VA fields — admin editable but labelled */}
+              <div className="border-t border-gray-800 pt-4 mt-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <VABadge />
-                  <span className="text-xs text-gray-400">Fill in after confirming with the VA</span>
+                  <span className="text-xs bg-yellow-900/60 text-yellow-400 border border-yellow-800/60 px-2 py-0.5 rounded">FROM VA</span>
+                  <span className="text-xs text-gray-500">VA fills this on their dashboard — you can also edit here</span>
                 </div>
                 <div className="grid grid-cols-1 gap-4">
                   <div>
@@ -459,11 +496,11 @@ export default function OffboardingPage() {
               </div>
             </div>
 
-            {/* 2. KPI Review */}
+            {/* 2. KPI */}
             <div className={cardClass}>
               <div className="flex items-center gap-2 mb-4">
                 <p className="text-sm font-semibold text-gray-300 uppercase tracking-wide">2. KPI & Work Review</p>
-                <AdminBadge />
+                <span className="text-xs bg-teal-900/60 text-teal-400 border border-teal-800/60 px-2 py-0.5 rounded">ADMIN</span>
               </div>
               {kpiLoading ? (
                 <p className="text-gray-400 text-sm">Loading portal data...</p>
@@ -499,14 +536,14 @@ export default function OffboardingPage() {
               )}
             </div>
 
-            {/* 3. Final Invoice */}
+            {/* 3. Invoice */}
             <div className={cardClass}>
               <div className="flex items-center gap-2 mb-4">
                 <p className="text-sm font-semibold text-gray-300 uppercase tracking-wide">3. Final Invoice</p>
-                <VABadge />
+                <span className="text-xs bg-yellow-900/60 text-yellow-400 border border-yellow-800/60 px-2 py-0.5 rounded">FROM VA</span>
               </div>
               <div className="bg-yellow-950/30 border border-yellow-900/40 rounded-lg p-3 mb-4 text-sm text-yellow-300/80">
-                The VA calculates their own invoice based on deliverables actually completed, cross-checks against Geekbot, and sends it directly to <strong className="text-yellow-300">accounting@joburn.com</strong> using the Cyborg VA Invoice Template. Record the details here once received.
+                VA prepares their invoice based on deliverables completed and sends it to <strong className="text-yellow-300">accounting@joburn.com</strong>. The details below are filled by the VA and synced here.
               </div>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
@@ -532,7 +569,7 @@ export default function OffboardingPage() {
             <div className={cardClass}>
               <div className="flex items-center gap-2 mb-4">
                 <p className="text-sm font-semibold text-gray-300 uppercase tracking-wide">4. Tool Access Revocation</p>
-                <AdminBadge />
+                <span className="text-xs bg-teal-900/60 text-teal-400 border border-teal-800/60 px-2 py-0.5 rounded">ADMIN</span>
               </div>
               <div className="grid grid-cols-2 gap-3 mb-4">
                 {([
@@ -545,8 +582,7 @@ export default function OffboardingPage() {
                   ['onepw_removed', '1Password'],
                 ] as [keyof Form, string][]).map(([field, label]) => (
                   <label key={field} className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" checked={form[field] as boolean} onChange={e => set(field, e.target.checked)}
-                      className="w-4 h-4 rounded accent-blue-500" />
+                    <input type="checkbox" checked={form[field] as boolean} onChange={e => set(field, e.target.checked)} className="w-4 h-4 rounded accent-blue-500" />
                     <span className="text-sm text-gray-300">{label}</span>
                   </label>
                 ))}
@@ -559,7 +595,7 @@ export default function OffboardingPage() {
             <div className={cardClass}>
               <div className="flex items-center gap-2 mb-4">
                 <p className="text-sm font-semibold text-gray-300 uppercase tracking-wide">5. Handoff & Close Out</p>
-                <AdminBadge />
+                <span className="text-xs bg-teal-900/60 text-teal-400 border border-teal-800/60 px-2 py-0.5 rounded">ADMIN</span>
               </div>
               <div className="mb-4">
                 <label className={labelClass}>Tasks Reassigned To</label>
@@ -584,12 +620,15 @@ export default function OffboardingPage() {
             </div>
 
             <div className="flex justify-end gap-3 pb-8">
-              {initiated && !disabled && (
-                <button onClick={handleDisable} disabled={disabling} className="text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg">
-                  {disabling ? 'Completing...' : 'Complete Offboarding'}
+              <button onClick={handleSave} disabled={saving} className="text-sm bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg border border-gray-600">
+                {saving ? 'Saving...' : savedAt ? `Saved ${savedAt}` : 'Save Progress'}
+              </button>
+              {initiated && !completed && (
+                <button onClick={handleComplete} disabled={completing} className="text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg">
+                  {completing ? 'Completing...' : 'Complete Offboarding'}
                 </button>
               )}
-              {disabled && <span className="text-green-400 text-sm flex items-center">✓ Offboarding complete</span>}
+              {completed && <span className="text-green-400 text-sm flex items-center">✓ Offboarding complete</span>}
               <button onClick={() => setView('report')} className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg">
                 Preview Report →
               </button>
