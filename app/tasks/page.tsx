@@ -541,21 +541,25 @@ export default function TasksPage() {
     if (!viewingId || !exportFrom || !exportTo) return
     setExporting(true)
 
-    // Snap a date string to its Monday
-    function snapMonday(s: string): string {
-      const d = new Date(s + 'T00:00:00')
-      const day = d.getDay()
-      d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day))
-      return d.toISOString().split('T')[0]
+    // Snap a YYYY-MM-DD string to its Monday as a local-midnight Date object.
+    // Must NOT use toISOString() here — that converts to UTC and shifts the date for PHT users.
+    function toLocalMonday(s: string): Date {
+      const [y, mo, d] = s.split('-').map(Number)
+      const date = new Date(y, mo - 1, d) // local midnight, no timezone shift
+      const day = date.getDay()
+      date.setDate(date.getDate() + (day === 0 ? -6 : 1 - day))
+      date.setHours(0, 0, 0, 0)
+      return date
     }
 
-    const start = snapMonday(exportFrom)
-    const end = snapMonday(exportTo)
+    const startDate = toLocalMonday(exportFrom)
+    const endDate = toLocalMonday(exportTo)
 
-    // Collect all week_starts in range
+    // Collect week_starts using the same method as getMonday() in this file:
+    // local Monday midnight → toISOString() → split T[0] (gives Sunday UTC for PHT users,
+    // which is exactly what the DB stores).
     const weekStarts: string[] = []
-    const cur = new Date(start + 'T00:00:00')
-    const endDate = new Date(end + 'T00:00:00')
+    const cur = new Date(startDate)
     while (cur <= endDate) {
       weekStarts.push(cur.toISOString().split('T')[0])
       cur.setDate(cur.getDate() + 7)
@@ -579,8 +583,10 @@ export default function TasksPage() {
       ? `${members.find(m => m.id === selectedMemberId)?.first_name ?? ''} ${members.find(m => m.id === selectedMemberId)?.last_name ?? ''}`.trim()
       : memberName
 
-    const fmt = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    const lines: string[] = [`Task Sheet — ${resolvedName} — ${fmt(start)} to ${fmt(end)}`, '']
+    const fmtDate = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    const startStr = `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-${String(startDate.getDate()).padStart(2,'0')}`
+    const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')}`
+    const lines: string[] = [`Task Sheet — ${resolvedName} — ${fmtDate(startDate)} to ${fmtDate(endDate)}`, '']
 
     const multiWeek = weekStarts.length > 1
 
@@ -620,7 +626,7 @@ export default function TasksPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `tasksheet-${resolvedName.replace(/\s+/g, '-')}-${start}-to-${end}.csv`
+    a.download = `tasksheet-${resolvedName.replace(/\s+/g, '-')}-${startStr}-to-${endStr}.csv`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
