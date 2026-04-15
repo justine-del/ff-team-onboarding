@@ -233,6 +233,10 @@ export default function TasksPage() {
   const [expandedNote, setExpandedNote] = useState<string | null>(null)
   const [pastReports, setPastReports] = useState<{id: number; week_of: string; report_text: string}[]>([])
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null)
+  const [showExport, setShowExport] = useState(false)
+  const [exportFrom, setExportFrom] = useState('')
+  const [exportTo, setExportTo] = useState('')
+  const [exporting, setExporting] = useState(false)
 
   const [viewingMonday, setViewingMonday] = useState<Date>(() => getMonday())
   const currentMonday = getMonday()
@@ -533,6 +537,98 @@ export default function TasksPage() {
     setPastReports(data ?? [])
   }
 
+  async function handleExportCSV() {
+    if (!viewingId || !exportFrom || !exportTo) return
+    setExporting(true)
+
+    // Snap a date string to its Monday
+    function snapMonday(s: string): string {
+      const d = new Date(s + 'T00:00:00')
+      const day = d.getDay()
+      d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day))
+      return d.toISOString().split('T')[0]
+    }
+
+    const start = snapMonday(exportFrom)
+    const end = snapMonday(exportTo)
+
+    // Collect all week_starts in range
+    const weekStarts: string[] = []
+    const cur = new Date(start + 'T00:00:00')
+    const endDate = new Date(end + 'T00:00:00')
+    while (cur <= endDate) {
+      weekStarts.push(cur.toISOString().split('T')[0])
+      cur.setDate(cur.getDate() + 7)
+    }
+
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('task_completions')
+      .select('task_id, day, time_spent, week_start')
+      .eq('user_id', viewingId)
+      .in('week_start', weekStarts)
+      .gt('time_spent', 0)
+    const rows = data ?? []
+
+    const allTasks = [
+      ...DEFAULT_TASKS.map(t => ({ key: String(t.id), name: t.name, sop: t.sop_number })),
+      ...customTasks.map(t => ({ key: `custom-${t.id}`, name: t.task_name, sop: 'Custom' })),
+    ]
+
+    const resolvedName = selectedMemberId
+      ? `${members.find(m => m.id === selectedMemberId)?.first_name ?? ''} ${members.find(m => m.id === selectedMemberId)?.last_name ?? ''}`.trim()
+      : memberName
+
+    const fmt = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    const lines: string[] = [`Task Sheet — ${resolvedName} — ${fmt(start)} to ${fmt(end)}`, '']
+
+    const multiWeek = weekStarts.length > 1
+
+    if (multiWeek) {
+      const weekLabels = weekStarts.map(w => new Date(w + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+      lines.push(['SOP', 'Task', ...weekLabels, 'Total (hrs)'].join(','))
+      let grand = 0
+      const wTotals = new Array(weekStarts.length).fill(0)
+      for (const task of allTasks) {
+        const tid = task.key.startsWith('custom-') ? 10000 + parseInt(task.key.replace('custom-', '')) : parseInt(task.key)
+        const wMins = weekStarts.map(w => rows.filter(r => r.task_id === tid && r.week_start === w).reduce((s, r) => s + (r.time_spent ?? 0), 0))
+        const total = wMins.reduce((a, b) => a + b, 0)
+        if (!total) continue
+        wMins.forEach((m, i) => { wTotals[i] += m })
+        grand += total
+        lines.push([task.sop, `"${task.name}"`, ...wMins.map(m => m ? (m / 60).toFixed(1) : '-'), (total / 60).toFixed(1)].join(','))
+      }
+      lines.push('', ['', 'TOTAL', ...wTotals.map(m => (m / 60).toFixed(1)), (grand / 60).toFixed(1)].join(','))
+    } else {
+      lines.push(['SOP', 'Task', ...DAYS, 'Total (hrs)'].join(','))
+      let grand = 0
+      const dTotals = new Array(DAYS.length).fill(0)
+      for (const task of allTasks) {
+        const tid = task.key.startsWith('custom-') ? 10000 + parseInt(task.key.replace('custom-', '')) : parseInt(task.key)
+        const dMins = DAYS.map(d => rows.find(r => r.task_id === tid && r.day === d)?.time_spent ?? 0)
+        const total = dMins.reduce((a, b) => a + b, 0)
+        if (!total) continue
+        dMins.forEach((m, i) => { dTotals[i] += m })
+        grand += total
+        lines.push([task.sop, `"${task.name}"`, ...dMins.map(m => m ? (m / 60).toFixed(1) : '-'), (total / 60).toFixed(1)].join(','))
+      }
+      lines.push('', ['', 'TOTAL', ...dTotals.map(m => (m / 60).toFixed(1)), (grand / 60).toFixed(1)].join(','))
+    }
+
+    const csv = '\ufeff' + lines.join('\n') // BOM for Excel
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `tasksheet-${resolvedName.replace(/\s+/g, '-')}-${start}-to-${end}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    setExporting(false)
+    setShowExport(false)
+  }
+
   async function openPastReports() {
     const targetId = selectedMemberId ?? userId
     setShowReport(true)
@@ -607,13 +703,57 @@ export default function TasksPage() {
           <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">← Dashboard</Link>
           <h1 className="text-lg font-bold">My Task Sheet</h1>
         </div>
-        <button
-          onClick={generateReport}
-          className="text-sm bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors"
-        >
-          Generate EOW Report
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setShowExport(v => !v); setExportFrom(''); setExportTo('') }}
+            className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={generateReport}
+            className="text-sm bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            Generate EOW Report
+          </button>
+        </div>
       </nav>
+
+      {showExport && (
+        <div className="bg-gray-900 border-b border-gray-800 px-6 py-4">
+          <div className="max-w-5xl mx-auto">
+            <p className="text-xs text-gray-400 mb-3">Select the date range to export. Includes all tasks with logged time.</p>
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-400 whitespace-nowrap">From week of</label>
+                <input
+                  type="date"
+                  value={exportFrom}
+                  onChange={e => setExportFrom(e.target.value)}
+                  className="bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-400 whitespace-nowrap">To week of</label>
+                <input
+                  type="date"
+                  value={exportTo}
+                  onChange={e => setExportTo(e.target.value)}
+                  className="bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                onClick={handleExportCSV}
+                disabled={!exportFrom || !exportTo || exporting}
+                className="text-sm bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg"
+              >
+                {exporting ? 'Downloading...' : 'Download CSV'}
+              </button>
+              <button onClick={() => setShowExport(false)} className="text-xs text-gray-500 hover:text-gray-400">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <QuickNav />
 
