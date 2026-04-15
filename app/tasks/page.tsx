@@ -575,51 +575,76 @@ export default function TasksPage() {
     const rows = data ?? []
 
     const allTasks = [
-      ...DEFAULT_TASKS.map(t => ({ key: String(t.id), name: t.name, sop: t.sop_number })),
-      ...customTasks.map(t => ({ key: `custom-${t.id}`, name: t.task_name, sop: 'Custom' })),
+      ...DEFAULT_TASKS.map(t => ({ key: String(t.id), name: t.name, sop: t.sop_number, days: t.days.join('/'), timeWindow: t.time_window, estTime: t.est_time })),
+      ...customTasks.map(t => ({ key: `custom-${t.id}`, name: t.task_name, sop: 'Custom', days: t.days?.join('/') ?? 'Mon–Fri', timeWindow: t.time_window ?? '', estTime: t.est_time ?? '' })),
     ]
 
     const resolvedName = selectedMemberId
       ? `${members.find(m => m.id === selectedMemberId)?.first_name ?? ''} ${members.find(m => m.id === selectedMemberId)?.last_name ?? ''}`.trim()
       : memberName
 
-    const fmtDate = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    const startStr = `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-${String(startDate.getDate()).padStart(2,'0')}`
-    const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')}`
-    const lines: string[] = [`Task Sheet — ${resolvedName} — ${fmtDate(startDate)} to ${fmtDate(endDate)}`, '']
+    // Format a local-midnight Date as "MMM D" (e.g. "Mar 16")
+    const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const fmtFull = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    const toLocalStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    const startStr = toLocalStr(startDate)
+    const endStr = toLocalStr(endDate)
 
-    const multiWeek = weekStarts.length > 1
+    // Title
+    const lines: string[] = [
+      `${resolvedName.toUpperCase()} — FULL TASK LOG  |  ${fmtFull(startDate)} – ${fmtFull(endDate)}`,
+      '',
+      ['Week', 'SOP #', 'Task Name', 'Schedule', 'Time Window', 'Est. Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Total (mins)', 'Total (hrs)'].join(','),
+    ]
 
-    if (multiWeek) {
-      const weekLabels = weekStarts.map(w => new Date(w + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
-      lines.push(['SOP', 'Task', ...weekLabels, 'Total (hrs)'].join(','))
-      let grand = 0
-      const wTotals = new Array(weekStarts.length).fill(0)
+    let grandTotal = 0
+
+    // One block per week
+    for (let wi = 0; wi < weekStarts.length; wi++) {
+      const ws = weekStarts[wi]
+      // Derive Monday date from week_start (which is Sunday UTC for PHT = Monday local)
+      const monDate = new Date(startDate)
+      monDate.setDate(startDate.getDate() + wi * 7)
+      const sunDate = new Date(monDate)
+      sunDate.setDate(monDate.getDate() + 6)
+      const weekLabel = `${fmtShort(monDate)}–${fmtShort(sunDate)}`
+
+      // Calculate week total
+      const weekRows = rows.filter(r => r.week_start === ws)
+      const weekTotal = weekRows.reduce((s, r) => s + (r.time_spent ?? 0), 0)
+
+      // Week header row
+      lines.push(`${weekLabel}  |  Total: ${(weekTotal / 60).toFixed(1)} hrs`)
+
+      const dTotals = new Array(7).fill(0)
+
       for (const task of allTasks) {
         const tid = task.key.startsWith('custom-') ? 10000 + parseInt(task.key.replace('custom-', '')) : parseInt(task.key)
-        const wMins = weekStarts.map(w => rows.filter(r => r.task_id === tid && r.week_start === w).reduce((s, r) => s + (r.time_spent ?? 0), 0))
-        const total = wMins.reduce((a, b) => a + b, 0)
-        if (!total) continue
-        wMins.forEach((m, i) => { wTotals[i] += m })
-        grand += total
-        lines.push([task.sop, `"${task.name}"`, ...wMins.map(m => m ? (m / 60).toFixed(1) : '-'), (total / 60).toFixed(1)].join(','))
-      }
-      lines.push('', ['', 'TOTAL', ...wTotals.map(m => (m / 60).toFixed(1)), (grand / 60).toFixed(1)].join(','))
-    } else {
-      lines.push(['SOP', 'Task', ...DAYS, 'Total (hrs)'].join(','))
-      let grand = 0
-      const dTotals = new Array(DAYS.length).fill(0)
-      for (const task of allTasks) {
-        const tid = task.key.startsWith('custom-') ? 10000 + parseInt(task.key.replace('custom-', '')) : parseInt(task.key)
-        const dMins = DAYS.map(d => rows.find(r => r.task_id === tid && r.day === d)?.time_spent ?? 0)
+        const dMins = DAYS.map(d => rows.find(r => r.task_id === tid && r.week_start === ws && r.day === d)?.time_spent ?? 0)
         const total = dMins.reduce((a, b) => a + b, 0)
         if (!total) continue
         dMins.forEach((m, i) => { dTotals[i] += m })
-        grand += total
-        lines.push([task.sop, `"${task.name}"`, ...dMins.map(m => m ? (m / 60).toFixed(1) : '-'), (total / 60).toFixed(1)].join(','))
+        lines.push([
+          weekLabel,
+          task.sop,
+          `"${task.name}"`,
+          `"${task.days}"`,
+          task.timeWindow,
+          task.estTime,
+          ...dMins.map(m => m || ''),
+          total,
+          (total / 60).toFixed(1),
+        ].join(','))
       }
-      lines.push('', ['', 'TOTAL', ...dTotals.map(m => (m / 60).toFixed(1)), (grand / 60).toFixed(1)].join(','))
+
+      // Week subtotal row
+      lines.push(['', '', 'WEEK TOTAL', '', '', '', ...dTotals.map(m => m ? (m / 60).toFixed(1) : ''), (weekTotal / 60).toFixed(1), (weekTotal / 60).toFixed(1)].join(','))
+      lines.push('') // blank row between weeks
+
+      grandTotal += weekTotal
     }
+
+    lines.push(['', '', 'GRAND TOTAL', '', '', '', '', '', '', '', '', '', '', grandTotal, (grandTotal / 60).toFixed(1)].join(','))
 
     const csv = '\ufeff' + lines.join('\n') // BOM for Excel
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
