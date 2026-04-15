@@ -155,6 +155,9 @@ export default function AdminPage() {
           <Link href="/admin/users" className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
             Manage Users
           </Link>
+          <Link href="/tasks" className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
+            Task Sheet
+          </Link>
           <Link href="/guide" className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
             Guide
           </Link>
