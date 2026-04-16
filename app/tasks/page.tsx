@@ -9,8 +9,8 @@ const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const TIME_OPTIONS = [0, 5, 10, 15, 30, 60, 90, 120, 180, 240, 300, 360]
 
 const DEFAULT_TASKS = [
-  { id: 1, sop_number: '1',     name: 'Understanding Your Core Sheet',    description: 'Review and understand the updates in your core tracking sheet',            days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '8 PM EST', est_time: '10 mins', is_eow: false, loom_link: 'https://www.loom.com/share/6407bed964d14db8a26374c028bc4970',    doc_link: 'https://docs.google.com/document/d/1NpFOIAjPa_pKZ8o6L7qfyCj4XSpAwv_St1H1GfsCuSQ/edit?tab=t.0',                                                                                    form_link: null },
-  { id: 2, sop_number: '2',     name: 'Daily and Weekly SOP Creation',    description: 'Create and update your daily and weekly standard operating procedures',     days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '8 PM EST', est_time: '10 mins', is_eow: false, loom_link: 'https://www.loom.com/share/6ae36b6a3e074b5e8c525e2d79b88572',    doc_link: 'https://docs.google.com/document/d/10RIeXKvyUjhCyMcR2ERnsTyuntfhBkPSe6SW9fvuQMw/edit?tab=t.tkyxfcvf5q4m',                                                                          form_link: null },
+  { id: 1, sop_number: '1',     name: 'Understanding Your Core Sheet',    description: 'Review and understand the updates in your core tracking sheet',            days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '8 PM EST', est_time: '10 mins', is_eow: false, is_onetime: true,  loom_link: 'https://www.loom.com/share/6407bed964d14db8a26374c028bc4970',    doc_link: 'https://docs.google.com/document/d/1NpFOIAjPa_pKZ8o6L7qfyCj4XSpAwv_St1H1GfsCuSQ/edit?tab=t.0',                                                                                    form_link: null },
+  { id: 2, sop_number: '2',     name: 'Daily and Weekly SOP Creation',    description: 'Create and update your daily and weekly standard operating procedures',     days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '8 PM EST', est_time: '10 mins', is_eow: false, is_onetime: true,  loom_link: 'https://www.loom.com/share/6ae36b6a3e074b5e8c525e2d79b88572',    doc_link: 'https://docs.google.com/document/d/10RIeXKvyUjhCyMcR2ERnsTyuntfhBkPSe6SW9fvuQMw/edit?tab=t.tkyxfcvf5q4m',                                                                          form_link: null },
   { id: 3, sop_number: 'EOW-1', name: 'EOW SOP Solidification',           description: 'Review and solidify all SOPs created during the week',                      days: ['Fri'],                        time_window: '5 PM EST', est_time: '1 hr',    is_eow: true,  loom_link: 'https://www.loom.com/share/803db3b5261647dc8eab7b966992d33e',    doc_link: 'https://docs.google.com/document/d/1zM-mbToha4scwgM5f4RZOwRPNwzvsstrMYgI8o8tlP4/edit?tab=t.2tixycp0z60y#heading=h.i1sai7oqo0os',                                                   form_link: null },
   { id: 4, sop_number: 'EOW-2', name: 'EOW VA Clear Out and Restart',     description: 'Clear your workspace and prepare for the new week',                         days: ['Fri'],                        time_window: '5 PM EST', est_time: '10 mins', is_eow: true,  loom_link: 'https://www.loom.com/share/0f1c078502d147038bd619e2b4e5bc4c',    doc_link: 'https://docs.google.com/document/d/1dgN71db7r0vbT3pvwyF_5fSs4f-VnmkWNwBvVv1IE7A/edit?tab=t.0#heading=h.el8shvjenf8a',                                                              form_link: null },
   { id: 5, sop_number: 'EOW-3', name: 'EOW FF Support Form Submission',   description: 'Submit the Funnel Futurist end-of-week support form',                       days: ['Fri'],                        time_window: '5 PM EST', est_time: '10 mins', is_eow: true,  loom_link: 'https://www.loom.com/share/62ac21c700f54d65bdf81751408d5103',    doc_link: 'https://docs.google.com/document/d/1cGWMOvOnSrd0xfhQKe2ctPYP9ZaXHkIcuWJf9iIOkNY/edit?tab=t.0#heading=h.vzbhezazyyz1',                                                             form_link: 'https://k0tk16hntji.typeform.com/to/P2Taxt4X' },
@@ -307,14 +307,15 @@ export default function TasksPage() {
       } else {
         // Member viewing their own data — direct client queries (RLS: auth.uid() = user_id)
         const supabase = createClient()
-        const [completionData, linkData, customData, dayOffData, noteData] = await Promise.all([
+        const [completionData, linkData, customData, dayOffData, noteData, onetimeData] = await Promise.all([
           supabase.from('task_completions').select('task_id, day, completed, time_spent').eq('user_id', viewingId).eq('week_start', weekStart),
           supabase.from('va_task_links').select('task_id, loom_link, sop_doc_link').eq('user_id', viewingId),
           supabase.from('va_custom_tasks').select('*').eq('user_id', viewingId).eq('active', true),
           supabase.from('day_off').select('day, type').eq('user_id', viewingId).eq('week_start', weekStart),
           supabase.from('va_task_notes').select('task_id, note').eq('user_id', viewingId).eq('week_start', weekStart),
+          supabase.from('task_completions').select('task_id, day, completed, time_spent').eq('user_id', viewingId).eq('week_start', '1970-01-01'),
         ])
-        completions = completionData.data ?? []
+        completions = [...(completionData.data ?? []), ...(onetimeData.data ?? [])]
         customTasksData = customData.data ?? []
         vaLinksData = linkData.data ?? []
         dayOffsData = dayOffData.data ?? []
@@ -377,6 +378,25 @@ export default function TasksPage() {
       setTimeout(() => setSaveError(null), 5000)
     }
     setSavingCell(null)
+  }
+
+  async function toggleOnetimeTask(taskId: number) {
+    if (!userId || !!selectedMemberId) return
+    const supabase = createClient()
+    const key = `${taskId}-done`
+    const current = (completions[key] ?? 0) > 0
+    const newVal = current ? 0 : 1
+    setCompletions(c => ({ ...c, [key]: newVal }))
+    const { error } = await supabase.from('task_completions').upsert({
+      user_id: userId, task_id: taskId, week_start: '1970-01-01', day: 'done',
+      time_spent: newVal, completed: newVal > 0,
+      completed_at: newVal > 0 ? new Date().toISOString() : null
+    }, { onConflict: 'user_id,task_id,week_start,day' })
+    if (error) {
+      setCompletions(c => ({ ...c, [key]: current ? 1 : 0 }))
+      setSaveError(`Failed to save: ${error.message}`)
+      setTimeout(() => setSaveError(null), 5000)
+    }
   }
 
   // EOW tasks use binary toggle
@@ -575,7 +595,7 @@ export default function TasksPage() {
     const rows = data ?? []
 
     const allTasks = [
-      ...DEFAULT_TASKS.map(t => ({ key: String(t.id), name: t.name, sop: t.sop_number, days: t.days.join('/'), timeWindow: t.time_window, estTime: t.est_time })),
+      ...DEFAULT_TASKS.filter(t => !t.is_onetime).map(t => ({ key: String(t.id), name: t.name, sop: t.sop_number, days: t.days.join('/'), timeWindow: t.time_window, estTime: t.est_time })),
       ...customTasks.map(t => ({ key: `custom-${t.id}`, name: t.task_name, sop: 'Custom', days: t.days?.join('/') ?? 'Mon–Fri', timeWindow: t.time_window ?? '', estTime: t.est_time ?? '' })),
     ]
 
@@ -671,8 +691,9 @@ export default function TasksPage() {
   }
 
   const isFriday = today === 'Fri'
-  const regularTasks = DEFAULT_TASKS.filter(t => !t.is_eow)
+  const regularTasks = DEFAULT_TASKS.filter(t => !t.is_eow && !t.is_onetime)
   const eowTasks = DEFAULT_TASKS.filter(t => t.is_eow)
+  const onetimeTasks = DEFAULT_TASKS.filter(t => t.is_onetime)
 
   function LinkSection({ taskId }: { taskId: number }) {
     const isOpen = expandedLinks === taskId
@@ -914,12 +935,52 @@ export default function TasksPage() {
         </div>
 
 
-        {/* ── MORNING TASKS ── */}
+        {/* ── WATCH & LEARN ── */}
+        <div className="mb-6">
+          <button onClick={() => toggleSection('onetime')} className="w-full flex items-center justify-between px-4 py-2.5 bg-green-950/40 border border-green-800/50 rounded-xl mb-3 hover:bg-green-950/60 transition-colors">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-400 flex-shrink-0"></span>
+              <span className="font-semibold text-green-300 text-sm">Watch & Learn</span>
+              <span className="text-xs text-green-400/60">{onetimeTasks.length} tasks · one-time</span>
+            </div>
+            <span className="text-green-400 text-xs">{collapsed.onetime ? '▼ Show' : '▲ Hide'}</span>
+          </button>
+
+          {!collapsed.onetime && (
+            <div className="space-y-2">
+              {onetimeTasks.map(task => {
+                const done = (completions[`${task.id}-done`] ?? 0) > 0
+                return (
+                  <div key={task.id} className={`flex items-start gap-4 border rounded-xl p-4 transition-colors ${done ? 'bg-green-950/20 border-green-800/40' : 'bg-gray-900 border-gray-800'}`}>
+                    <button
+                      onClick={() => toggleOnetimeTask(task.id)}
+                      disabled={!!selectedMemberId}
+                      className={`mt-0.5 w-5 h-5 flex-shrink-0 rounded border-2 transition-colors flex items-center justify-center ${done ? 'bg-green-600 border-green-500' : 'border-gray-600 hover:border-green-500'}`}
+                    >
+                      {done && <span className="text-white text-[10px] leading-none">✓</span>}
+                    </button>
+                    <div className="flex-1">
+                      <p className={`font-medium ${done ? 'line-through text-gray-500' : ''}`}>{task.name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>
+                      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                        {task.loom_link && <a href={task.loom_link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300">Watch tutorial →</a>}
+                        {task.doc_link && <a href={task.doc_link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">View SOP →</a>}
+                      </div>
+                    </div>
+                    {done && <span className="text-xs text-green-500 flex-shrink-0 mt-0.5">Done</span>}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── DAILY TASKS ── */}
         <div className="mb-6">
           <button onClick={() => toggleSection('morning')} className="w-full flex items-center justify-between px-4 py-2.5 bg-blue-950/40 border border-blue-800/50 rounded-xl mb-3 hover:bg-blue-950/60 transition-colors">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-400 flex-shrink-0"></span>
-              <span className="font-semibold text-blue-300 text-sm">Morning Tasks</span>
+              <span className="font-semibold text-blue-300 text-sm">Daily Tasks</span>
               <span className="text-xs text-blue-400/60">{regularTasks.length} tasks · daily</span>
             </div>
             <span className="text-blue-400 text-xs">{collapsed.morning ? '▼ Show' : '▲ Hide'}</span>
