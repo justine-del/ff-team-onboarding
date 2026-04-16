@@ -845,6 +845,20 @@ export default function TasksPage() {
         <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* ── SIDEBAR ── */}
         <div className="w-full lg:w-64 flex-shrink-0 flex flex-col gap-4 lg:sticky lg:top-4 order-first lg:order-last">
+          {/* Hours This Week */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs text-gray-400">Hours this week</span>
+              <span className={`text-sm font-bold ${weeklyMinutes > 0 ? 'text-green-400' : 'text-gray-600'}`}>{weeklyHours}h</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-gray-600 flex-wrap">
+              <span className="w-2 h-2 rounded-full bg-yellow-500/60 inline-block"></span><span>≤30m</span>
+              <span className="w-2 h-2 rounded-full bg-blue-500/60 inline-block"></span><span>≤90m</span>
+              <span className="w-2 h-2 rounded-full bg-green-500/60 inline-block"></span><span>≤4h</span>
+              <span className="w-2 h-2 rounded-full bg-purple-500/60 inline-block"></span><span>4h+</span>
+            </div>
+          </div>
+
           {/* Watch & Learn */}
           <div className="bg-gray-900 border border-green-800/30 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
@@ -927,28 +941,6 @@ export default function TasksPage() {
           </div>
           <button onClick={goToNextWeek} disabled={isCurrentWeek} className={`px-2 py-1 rounded transition-colors text-lg leading-none ${isCurrentWeek ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white'}`}>→</button>
         </div>
-
-        {/* Weekly Hours Summary */}
-        <div className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 mb-6">
-          <div className="text-sm text-gray-400">
-            Week of {monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Hours logged:</span>
-              <span className={`text-sm font-semibold ${weeklyMinutes > 0 ? 'text-green-400' : 'text-gray-600'}`}>
-                {weeklyHours}h
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-gray-600">
-              <span className="w-2 h-2 rounded-full bg-yellow-500/60 inline-block"></span><span>≤30m</span>
-              <span className="w-2 h-2 rounded-full bg-blue-500/60 inline-block ml-1"></span><span>≤90m</span>
-              <span className="w-2 h-2 rounded-full bg-green-500/60 inline-block ml-1"></span><span>≤4h</span>
-              <span className="w-2 h-2 rounded-full bg-purple-500/60 inline-block ml-1"></span><span>4h+</span>
-            </div>
-          </div>
-        </div>
-
 
         {/* ── DAILY TASKS ── */}
         <div className="mb-6">
