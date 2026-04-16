@@ -46,9 +46,6 @@ export default async function DashboardPage() {
   const weekStarts8 = getWeekStarts(8)
   const currentWeek = weekStarts8[0]
 
-  // Company admins land on their team dashboard, not personal onboarding
-  if (profile?.role === 'admin') redirect('/admin')
-
   // VA is in the offboarding process — show their fillable form
   if (profile?.role === 'offboarding') {
     const { data: offboardingData } = await admin
@@ -60,6 +57,7 @@ export default async function DashboardPage() {
   }
 
   const isAdminUser = profile?.role === 'super_admin'
+  const hasAdminNav = profile?.role === 'admin' || profile?.role === 'super_admin'
 
   const [phase1, phase2, sops, tasks, weeklyStats, allMembers] = await Promise.all([
     supabase.from('phase1_completion').select('status').eq('user_id', user.id),
@@ -213,11 +211,11 @@ export default async function DashboardPage() {
       <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-lg font-bold">Cyborg VA Portal</h1>
         <div className="flex items-center gap-4">
+          {hasAdminNav && (
+            <Link href="/admin" className="text-sm text-blue-400 hover:text-blue-300">Admin</Link>
+          )}
           {isAdminUser && (
-            <>
-              <Link href="/admin" className="text-sm text-blue-400 hover:text-blue-300">Admin</Link>
-              <Link href="/admin/performance" className="text-sm text-purple-400 hover:text-purple-300">📊 Performance</Link>
-            </>
+            <Link href="/admin/performance" className="text-sm text-purple-400 hover:text-purple-300">📊 Performance</Link>
           )}
           <Link href="/guide" className="text-sm text-gray-400 hover:text-white">Guide</Link>
           <form action="/auth/signout" method="post">
