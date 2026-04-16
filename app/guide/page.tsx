@@ -99,6 +99,17 @@ export default async function GuidePage() {
               New VAs work through structured onboarding phases; active VAs use it every day to log work and stay accountable.
               Admins use it to monitor progress, manage content, and track team activity.
             </p>
+            <div className="mb-8">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Portal Walkthrough — Watch First</p>
+              <div style={{ position: 'relative', paddingBottom: '62.5%', height: 0 }}>
+                <iframe
+                  src="https://www.loom.com/embed/2c0325e334b9401eb8a966311a0e1b7c"
+                  frameBorder={0}
+                  allowFullScreen
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', borderRadius: '12px' }}
+                />
+              </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
               {[
                 ['Onboarding', 'Phase 1 → Phase 2 → SOPs. Each phase unlocks the next.'],
