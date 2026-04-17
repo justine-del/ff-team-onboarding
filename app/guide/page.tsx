@@ -320,8 +320,9 @@ export default async function GuidePage() {
                 <div className="grid divide-y divide-gray-800">
                   {[
                     ['Check it off', 'Tap the checkbox when you\'ve completed the task for that day'],
-                    ['Log time', 'Use the time dropdown to record how long the task took (5m, 15m, 30m, 1h, etc.)'],
-                    ['Add a note', 'Expand the note field to add context — what you worked on, what was difficult, any blockers'],
+                    ['Log time', 'Type the exact number of minutes in the time field (e.g. 47). Press Enter or click away to save. The color updates based on how long the task took.'],
+                    ['Track live', 'Click ▶ track to start a built-in timer. It keeps running even if you reload the page. Click ■ to stop — the elapsed minutes are added to the task automatically.'],
+                    ['Add a note', 'Expand the note field to add context — what you worked on, what was difficult, any blockers. Notes are included in your EOW report.'],
                     ['Watch the Loom', 'Each task has a Loom video with instructions. Watch it if you\'re unsure what the task involves.'],
                     ['Open the doc', 'Each task links to a Google Doc with the full SOP or reference material'],
                   ].map(([title, desc]) => (
