@@ -170,7 +170,7 @@ type NoteSectionProps = {
   setExpandedNote: (key: string | null) => void
   taskNotes: Record<string, string>
   setTaskNotes: React.Dispatch<React.SetStateAction<Record<string, string>>>
-  saveTaskNote: (taskId: number, note: string) => void
+  saveTaskNote: (taskId: number, note: string) => Promise<string | null>
   disabled: boolean
 }
 
@@ -179,11 +179,20 @@ function NoteSection({ taskKey, taskId, expandedNote, setExpandedNote, taskNotes
   const note = taskNotes[taskKey] ?? ''
   const hasNote = !!note.trim()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | string>('idle')
+
+  async function doSave(value: string) {
+    setSaveStatus('saving')
+    const err = await saveTaskNote(taskId, value)
+    setSaveStatus(err ?? 'saved')
+    if (!err) setTimeout(() => setSaveStatus('idle'), 2000)
+  }
 
   function handleChange(value: string) {
     setTaskNotes(prev => ({ ...prev, [taskKey]: value }))
+    setSaveStatus('idle')
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => saveTaskNote(taskId, value), 800)
+    debounceRef.current = setTimeout(() => doSave(value), 800)
   }
 
   return (
@@ -199,12 +208,17 @@ function NoteSection({ taskKey, taskId, expandedNote, setExpandedNote, taskNotes
           <textarea
             value={note}
             onChange={e => handleChange(e.target.value)}
-            onBlur={e => saveTaskNote(taskId, e.target.value)}
+            onBlur={e => doSave(e.target.value)}
             disabled={disabled}
             placeholder="Flag priority, blockers, or context for your EOW report — e.g. 'Main priority this week', 'Blocked on client response', 'Skipped — meeting overran'"
             rows={2}
             className="w-full bg-gray-800/60 border border-gray-700 rounded px-2 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 resize-none"
           />
+          {saveStatus === 'saving' && <p className="text-xs text-gray-500 mt-0.5">Saving...</p>}
+          {saveStatus === 'saved' && <p className="text-xs text-green-500 mt-0.5">Saved ✓</p>}
+          {saveStatus !== 'idle' && saveStatus !== 'saving' && saveStatus !== 'saved' && (
+            <p className="text-xs text-red-400 mt-0.5">Error: {saveStatus}</p>
+          )}
         </div>
       )}
     </div>
@@ -471,19 +485,19 @@ export default function TasksPage() {
     setCustomTasks(prev => prev.filter(t => t.id !== id))
   }
 
-  async function saveTaskNote(taskId: number, note: string) {
-    if (!userId || !!selectedMemberId || !isEditableWeek) return
+  async function saveTaskNote(taskId: number, note: string): Promise<string | null> {
+    if (!userId || !!selectedMemberId || !isEditableWeek) return null
     const supabase = createClient()
     if (note.trim()) {
       const { error } = await supabase.from('va_task_notes').upsert(
         { user_id: userId, task_id: taskId, week_start: weekStart, note },
         { onConflict: 'user_id,task_id,week_start' }
       )
-      if (error) setSaveError(`Note save failed: ${error.message}`)
+      return error?.message ?? null
     } else {
       const { error } = await supabase.from('va_task_notes').delete()
         .eq('user_id', userId).eq('task_id', taskId).eq('week_start', weekStart)
-      if (error) setSaveError(`Note delete failed: ${error.message}`)
+      return error?.message ?? null
     }
   }
 
