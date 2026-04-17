@@ -54,17 +54,24 @@ export async function POST(req: NextRequest) {
 
     const prompt = `You are writing a professional end-of-week performance report in the FIRST PERSON (I/me/my) as if ${memberName} is writing it themselves. Never use third-person ("she", "he", "they", "${memberName} completed..."). Always write as "I completed...", "I worked on...", "My focus was...", etc.
 
+TONE RULES — follow these strictly:
+- Keep the overall tone balanced, honest, and professional. Do NOT frame the report as negative or self-critical.
+- If task notes say a task was low priority, deprioritized, or deferred intentionally, treat those tasks as a conscious choice — NOT as a failure or missed task. Reframe them as "I intentionally deprioritized X to focus on Y" rather than "I missed X."
+- Highlight what was accomplished and why. Lead with wins, then provide context for anything not completed.
+- The Slack message must be upbeat and confident — not apologetic. Never say "I didn't meet my goals" or "I missed tasks."
+
 Week of: ${weekOf}
 Total hours logged: ${weeklyHours}h
 ${offDays ? `Days off/half days: ${offDays}` : ''}
+${taskNotes?.length ? `\nTask notes from the member (CRITICAL — read these carefully before writing anything; they explain priorities, context, and intentional decisions for the week. If a note says a task was low priority or not the focus, reflect that framing throughout the report):\n${(taskNotes as string[]).join('\n')}` : ''}
 
 Daily completion data:
 Day | Total Tasks | Completed | Rate
 ${tableText}
 
 Days with 100% completion: ${goodDays.join(', ') || 'None'}
-Days with missed tasks: ${badDays.join(', ') || 'None'}
-${missedByDay ? `Missed tasks by day:\n${missedByDay}` : ''}
+Days with incomplete tasks: ${badDays.join(', ') || 'None'}
+${missedByDay ? `Tasks not completed by day:\n${missedByDay}` : ''}
 
 Write a professional EOW report using EXACTLY this format and structure:
 
@@ -78,26 +85,24 @@ Write a professional EOW report using EXACTLY this format and structure:
 
 **2. Key Takeaways**
 
-- Days Performed Well: [List days with 100% or strong completion. Be specific.]
-- Days with Issues:
-  [For each day with missed tasks, list which specific tasks were missed.]
-- Patterns Noticed:
-  [1-2 observations about patterns in completion across the week.]
+- Focus This Week: [Summarize what the main priority or focus was this week, drawing from task notes. If notes explain that certain tasks were intentionally deprioritized, state that clearly and positively.]
+- Strong Days: [List days with 100% or high completion. If no perfect days, highlight the best-performing day and what was accomplished.]
+- Tasks Deferred or Deprioritized: [If task notes indicate tasks were intentionally skipped or made low priority, frame them as deliberate choices with the reason. Only call something an "issue" if there is no note explaining it.]
+- Patterns Noticed: [1-2 balanced observations about the week. Lead with what went well.]
 
 **3. Recommendations**
 
-[2-3 specific, actionable bullet points based on the week's performance.]
+[2-3 forward-looking, constructive bullet points. Focus on what to carry into next week, not on what went wrong. If notes mention specific plans or follow-ups, reference those here.]
 
 **4. Message to Founder (Slack)**
 
-[Write this as a Slack message — casual but professional, no subject line, no "Best regards" sign-off. Start with a greeting like "Hey [Founder's name]!" then 2-3 sentences: briefly summarize the week's overall performance in first person (I/me), mention anything notable or flag anything that needs attention, and close with a short forward-looking note for next week. Keep it conversational like a real Slack message.]
+[Casual but professional Slack message. No subject line, no "Best regards." Start with a warm greeting. 2-3 sentences: highlight the week's main focus and what was accomplished (first person), briefly mention anything intentionally deferred and why (if relevant), then close with a positive note about next week. Tone: confident and proactive, not apologetic.]
 
-Keep the tone professional and honest. Use only the data provided. Do not invent tasks or numbers.
-${taskNotes?.length ? `\nMember's own task notes (use as supporting context for takeaways and recommendations — do not quote verbatim):\n${(taskNotes as string[]).join('\n')}` : ''}`
+Keep the tone professional and honest. Use only the data provided. Do not invent tasks or numbers.`
 
     const completion = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
-      max_tokens: 1500,
+      max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
     })
 
