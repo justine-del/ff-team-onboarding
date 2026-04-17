@@ -6,7 +6,6 @@ import Link from 'next/link'
 import QuickNav from '@/components/QuickNav'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const TIME_OPTIONS = [0, 5, 10, 15, 30, 60, 90, 120, 180, 240, 300, 360]
 
 const DEFAULT_TASKS = [
   { id: 1, sop_number: '1',     name: 'Understanding Your Core Sheet',    description: 'Review and understand the updates in your core tracking sheet',            days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '8 PM EST', est_time: '10 mins', is_eow: false, is_onetime: true,  loom_link: 'https://www.loom.com/share/6407bed964d14db8a26374c028bc4970',    doc_link: 'https://docs.google.com/document/d/1NpFOIAjPa_pKZ8o6L7qfyCj4XSpAwv_St1H1GfsCuSQ/edit?tab=t.0',                                                                                    form_link: null },
@@ -162,6 +161,68 @@ function getMonday() {
 }
 
 type Member = { id: string; first_name: string; last_name: string; email: string }
+
+function TimerCell({ mins, disabled, onSave }: {
+  mins: number
+  disabled: boolean
+  onSave: (mins: number) => void
+}) {
+  const [inputVal, setInputVal] = useState(mins > 0 ? String(mins) : '')
+  const [timerStart, setTimerStart] = useState<number | null>(null)
+  const [elapsed, setElapsed] = useState(0)
+
+  useEffect(() => { setInputVal(mins > 0 ? String(mins) : '') }, [mins])
+
+  useEffect(() => {
+    if (!timerStart) return
+    const iv = setInterval(() => setElapsed(Math.floor((Date.now() - timerStart) / 1000)), 1000)
+    return () => clearInterval(iv)
+  }, [timerStart])
+
+  function commit(val: string) {
+    onSave(parseInt(val) || 0)
+  }
+
+  function stopTimer() {
+    if (!timerStart) return
+    const addedMins = Math.max(1, Math.round((Date.now() - timerStart) / 60000))
+    setTimerStart(null)
+    setElapsed(0)
+    const newMins = mins + addedMins
+    setInputVal(String(newMins))
+    onSave(newMins)
+  }
+
+  const elapsedDisplay = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`
+
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <input
+        type="number"
+        min="0"
+        value={inputVal}
+        placeholder="—"
+        onChange={e => setInputVal(e.target.value)}
+        onBlur={() => commit(inputVal)}
+        onKeyDown={e => { if (e.key === 'Enter') { commit(inputVal); (e.target as HTMLInputElement).blur() } }}
+        disabled={disabled}
+        className={`w-12 text-center text-xs rounded px-1 py-0.5 border focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${timeBadgeClass(mins)} ${disabled ? 'opacity-70 cursor-default' : ''}`}
+      />
+      {mins > 0 && <span className="text-[9px] text-gray-500 leading-none">{formatTime(mins)}</span>}
+      {!disabled && (
+        timerStart ? (
+          <button onClick={stopTimer} title="Stop timer" className="text-[10px] text-red-400 hover:text-red-300 font-mono leading-none transition-colors">
+            ■ {elapsedDisplay}
+          </button>
+        ) : (
+          <button onClick={() => { setTimerStart(Date.now()); setElapsed(0) }} title="Start timer" className="text-[10px] text-gray-600 hover:text-green-400 leading-none transition-colors">
+            ▶ track
+          </button>
+        )
+      )}
+    </div>
+  )
+}
 
 type NoteSectionProps = {
   taskKey: string
@@ -1069,16 +1130,11 @@ export default function TasksPage() {
                         return (
                           <td key={d} className={`text-center py-3 px-1 align-top ${isOff ? 'opacity-25' : ''}`}>
                             {isTaskDay && !isOff ? (
-                              <select
-                                value={mins}
-                                onChange={e => setTaskTime(task.id + 10000, d, parseInt(e.target.value))}
+                              <TimerCell
+                                mins={mins}
                                 disabled={!!selectedMemberId || isSaving}
-                                className={`text-xs rounded px-1 py-0.5 border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer w-14 ${isSaving ? 'opacity-50' : ''} ${timeBadgeClass(mins)} ${selectedMemberId ? 'cursor-default' : ''}`}
-                              >
-                                {TIME_OPTIONS.map(t => (
-                                  <option key={t} value={t} className="bg-gray-900 text-white">{formatTime(t)}</option>
-                                ))}
-                              </select>
+                                onSave={m => setTaskTime(task.id + 10000, d, m)}
+                              />
                             ) : (
                               <span className="text-gray-700 text-xs">—</span>
                             )}
