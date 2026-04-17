@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import QuickNav from '@/components/QuickNav'
@@ -178,6 +178,13 @@ function NoteSection({ taskKey, taskId, expandedNote, setExpandedNote, taskNotes
   const isOpen = expandedNote === taskKey
   const note = taskNotes[taskKey] ?? ''
   const hasNote = !!note.trim()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function handleChange(value: string) {
+    setTaskNotes(prev => ({ ...prev, [taskKey]: value }))
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => saveTaskNote(taskId, value), 800)
+  }
 
   return (
     <div className="mt-1">
@@ -191,7 +198,7 @@ function NoteSection({ taskKey, taskId, expandedNote, setExpandedNote, taskNotes
         <div className="mt-1.5">
           <textarea
             value={note}
-            onChange={e => setTaskNotes(prev => ({ ...prev, [taskKey]: e.target.value }))}
+            onChange={e => handleChange(e.target.value)}
             onBlur={e => saveTaskNote(taskId, e.target.value)}
             disabled={disabled}
             placeholder="Flag priority, blockers, or context for your EOW report — e.g. 'Main priority this week', 'Blocked on client response', 'Skipped — meeting overran'"
