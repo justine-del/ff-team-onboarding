@@ -162,16 +162,28 @@ function getMonday() {
 
 type Member = { id: string; first_name: string; last_name: string; email: string }
 
-function TimerCell({ mins, disabled, onSave }: {
+function TimerCell({ mins, disabled, onSave, completionKey }: {
   mins: number
   disabled: boolean
   onSave: (mins: number) => void
+  completionKey: string
 }) {
+  const storageKey = `timer-${completionKey}`
   const [inputVal, setInputVal] = useState(mins > 0 ? String(mins) : '')
   const [timerStart, setTimerStart] = useState<number | null>(null)
   const [elapsed, setElapsed] = useState(0)
 
   useEffect(() => { setInputVal(mins > 0 ? String(mins) : '') }, [mins])
+
+  // Restore timer from localStorage on mount (survives page reload)
+  useEffect(() => {
+    const saved = localStorage.getItem(storageKey)
+    if (saved) {
+      const start = parseInt(saved)
+      setTimerStart(start)
+      setElapsed(Math.floor((Date.now() - start) / 1000))
+    }
+  }, [storageKey])
 
   useEffect(() => {
     if (!timerStart) return
@@ -183,9 +195,17 @@ function TimerCell({ mins, disabled, onSave }: {
     onSave(parseInt(val) || 0)
   }
 
+  function startTimer() {
+    const now = Date.now()
+    localStorage.setItem(storageKey, String(now))
+    setTimerStart(now)
+    setElapsed(0)
+  }
+
   function stopTimer() {
     if (!timerStart) return
     const addedMins = Math.max(1, Math.round((Date.now() - timerStart) / 60000))
+    localStorage.removeItem(storageKey)
     setTimerStart(null)
     setElapsed(0)
     const newMins = mins + addedMins
@@ -215,7 +235,7 @@ function TimerCell({ mins, disabled, onSave }: {
             ■ {elapsedDisplay}
           </button>
         ) : (
-          <button onClick={() => { setTimerStart(Date.now()); setElapsed(0) }} title="Start timer" className="text-[10px] text-gray-600 hover:text-green-400 leading-none transition-colors">
+          <button onClick={startTimer} title="Start timer" className="text-[10px] text-gray-600 hover:text-green-400 leading-none transition-colors">
             ▶ track
           </button>
         )
@@ -1134,6 +1154,7 @@ export default function TasksPage() {
                                 mins={mins}
                                 disabled={!!selectedMemberId || isSaving}
                                 onSave={m => setTaskTime(task.id + 10000, d, m)}
+                                completionKey={key}
                               />
                             ) : (
                               <span className="text-gray-700 text-xs">—</span>
