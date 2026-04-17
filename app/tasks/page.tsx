@@ -475,13 +475,15 @@ export default function TasksPage() {
     if (!userId || !!selectedMemberId || !isEditableWeek) return
     const supabase = createClient()
     if (note.trim()) {
-      await supabase.from('va_task_notes').upsert(
-        { user_id: userId, task_id: taskId, week_start: weekStart, note, updated_at: new Date().toISOString() },
+      const { error } = await supabase.from('va_task_notes').upsert(
+        { user_id: userId, task_id: taskId, week_start: weekStart, note },
         { onConflict: 'user_id,task_id,week_start' }
       )
+      if (error) setSaveError(`Note save failed: ${error.message}`)
     } else {
-      await supabase.from('va_task_notes').delete()
+      const { error } = await supabase.from('va_task_notes').delete()
         .eq('user_id', userId).eq('task_id', taskId).eq('week_start', weekStart)
+      if (error) setSaveError(`Note delete failed: ${error.message}`)
     }
   }
 
