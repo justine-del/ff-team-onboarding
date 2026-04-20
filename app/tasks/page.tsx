@@ -369,7 +369,7 @@ export default function TasksPage() {
       setUserId(user.id)
 
       const { data: profile } = await supabase.from('profiles').select('role, first_name, last_name').eq('id', user.id).single()
-      const admin = profile?.role === 'admin'
+      const admin = profile?.role === 'admin' || profile?.role === 'super_admin'
       setIsAdmin(admin)
       setMemberName(`${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim())
 
