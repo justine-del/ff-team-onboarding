@@ -149,13 +149,10 @@ type VALink = {
 
 function getMonday() {
   const now = new Date()
-  const day = now.getDay()   // local day of week (PHT for PH-based members)
-  const hour = now.getHours() // local hour
-  // Mondays before 6pm PHT still belong to last week — members have until 5:59pm to log
-  const stillLastWeek = day === 1 && hour < 18
+  const day = now.getDay()
   const diff = day === 0 ? -6 : 1 - day
   const monday = new Date(now)
-  monday.setDate(now.getDate() + diff + (stillLastWeek ? -7 : 0))
+  monday.setDate(now.getDate() + diff)
   monday.setHours(0, 0, 0, 0)
   return monday
 }

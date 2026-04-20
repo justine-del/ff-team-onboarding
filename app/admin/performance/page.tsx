@@ -29,13 +29,9 @@ function getWeekStarts(n = 4): string[] {
   const PHT = 8 * 60 * 60 * 1000
   const phtNow = new Date(Date.now() + PHT) // PHT time expressed as a UTC-shifted value
   const day = phtNow.getUTCDay()
-  const hour = phtNow.getUTCHours()
-  // Mondays before 6pm PHT still belong to the previous week (grace period for EOW reports)
-  const stillLastWeek = day === 1 && hour < 18
-
   const diff = day === 0 ? -6 : 1 - day
   const mondayPHT = new Date(phtNow)
-  mondayPHT.setUTCDate(phtNow.getUTCDate() + diff + (stillLastWeek ? -7 : 0))
+  mondayPHT.setUTCDate(phtNow.getUTCDate() + diff)
   mondayPHT.setUTCHours(0, 0, 0, 0) // midnight PHT in our shifted representation
 
   // Subtract 8 h to get the actual UTC timestamp for PHT midnight (= Sunday 4pm UTC)

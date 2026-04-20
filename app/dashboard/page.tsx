@@ -30,11 +30,9 @@ export default async function DashboardPage() {
     const PHT = 8 * 60 * 60 * 1000
     const phtNow = new Date(Date.now() + PHT)
     const day = phtNow.getUTCDay()
-    const hour = phtNow.getUTCHours()
-    const stillLastWeek = day === 1 && hour < 18 // Monday before 6pm PHT
     const diff = day === 0 ? -6 : 1 - day
     const mondayPHT = new Date(phtNow)
-    mondayPHT.setUTCDate(phtNow.getUTCDate() + diff + (stillLastWeek ? -7 : 0))
+    mondayPHT.setUTCDate(phtNow.getUTCDate() + diff)
     mondayPHT.setUTCHours(0, 0, 0, 0)
     const mondayAsUTC = new Date(mondayPHT.getTime() - PHT) // midnight PHT = 4pm UTC prev day
     return Array.from({ length: n }, (_, i) => {
