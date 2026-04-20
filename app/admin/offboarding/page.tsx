@@ -80,7 +80,7 @@ export default function OffboardingPage() {
       if (profile?.role !== 'admin' && profile?.role !== 'super_admin') { router.push('/dashboard'); return }
       const { data } = await supabase.from('profiles').select('*')
         .eq('company_id', profile?.company_id)
-        .in('role', ['member', 'offboarding'])
+        .in('role', ['member', 'offboarding', 'offboarded'])
         .order('first_name')
       setVAs(data ?? [])
     }
@@ -396,7 +396,7 @@ export default function OffboardingPage() {
             <option value="">— Choose a team member —</option>
             {vas.map(va => (
               <option key={va.id} value={va.id}>
-                {va.first_name} {va.last_name} ({va.email}){va.role === 'offboarding' ? ' — In Progress' : ''}
+                {va.first_name} {va.last_name} ({va.email}){va.role === 'offboarding' ? ' — In Progress' : va.role === 'offboarded' ? ' — Offboarded' : ''}
               </option>
             ))}
           </select>

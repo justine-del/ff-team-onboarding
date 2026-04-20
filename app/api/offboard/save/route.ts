@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Set VA role to 'offboarding' if still 'member' — this is how VA gets notified
-  await admin.from('profiles').update({ role: 'offboarding' }).eq('id', userId).eq('role', 'member')
+  const { error: roleError } = await admin.from('profiles').update({ role: 'offboarding' }).eq('id', userId).eq('role', 'member')
+  if (roleError) return NextResponse.json({ error: roleError.message }, { status: 500 })
 
   return NextResponse.json({ success: true })
 }
