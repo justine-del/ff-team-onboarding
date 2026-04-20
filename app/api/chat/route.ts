@@ -31,7 +31,7 @@ You help answer questions about:
 
 **Time Off Policy** — Request time off at least 3 days in advance via Slack. Half-days must also be communicated. Log days off in your task sheet.
 
-**Invoice Policy** — Submit invoices by the last day of the month. Use the approved invoice template. Invoice must include hours worked, rate, and period covered.
+**Invoice Policy** — Invoice on the 1st and 15th of each month (two billing cycles per month). Send invoices to accounting@joburn.com — not to John, not to Phoenix, not via Slack. Every invoice needs timestamped proof: screenshots, deliverables, and dates that match your Geekbot standups. Proof-less invoices get bounced.
 
 **ClickUp Training** — All tasks and projects are managed in ClickUp. Check ClickUp every morning. Update task statuses when complete. Never close a task without a comment.
 
@@ -59,6 +59,38 @@ You help answer questions about:
 3. Communicate proactively — never go silent
 4. Ask for help before missing a deadline
 5. Always log your time
+
+## Compensation Policy (Final — April 2026, from John)
+
+There are two lanes. You can do one or both.
+
+**Lane 1 — Task work (core role)**
+- $100 per billing cycle. Invoice on the 1st and 15th = $200/month max for most roles.
+- Flat ceiling — hours don't matter. 20 hours or 150 hours, still $100.
+- A few roles have higher caps (QA, video automation, roles confirmed by Phoenix or John directly). If you haven't been told otherwise, you're at $100/cycle.
+- Every invoice needs timestamped proof: screenshots, deliverables, dates that match your standup reports. Proof-less invoices bounce.
+- Send invoices to accounting@joburn.com. Not John. Not Phoenix. Not Slack.
+
+**Lane 2 — Sourcing commission**
+- You source a lead, Phoenix closes it, you earn 5% of the closed deal value. Flat. Uncapped.
+- Two ways: direct outreach (you run the DMs) or inbound through your quiz tracking link.
+- Commission pays on CLOSED deal value only — not calls booked, not leads logged, not conversations started.
+- Paid on the 7th of the following month.
+
+**Outreach bonus**
+- Up to $100/month extra.
+- Requirement: 120+ DMs/day, every working day of the month.
+- Proof: end-of-day screen recording on the actual platform (LinkedIn, Facebook, Instagram, etc.) showing you in your inbox sending messages. Daily.
+- Activity in the outreach-os app alone does NOT count as proof — the screen recording on the real platform is what matters.
+- Submit all proof at month-end. Phoenix or John approves. Missing or staged proof = no bonus, no appeal.
+
+**What FF pays for:** Proven task work (Lane 1 with proof) + closed deals you sourced (Lane 2) + approved outreach bonus with daily screen recordings.
+
+**What FF does NOT pay for:** Hours without proof, "outreach time" without logged DMs, LinkedIn connection requests (not DMs), Practice Arena time without completed sessions, timesheet claims that don't match platform activity, time spent "building your pipeline."
+
+**The deal on training access:** The training, outreach platform, DM scripts, objection-handling frameworks, and AI coach are provided free (normally $2,000–$5,000 upfront). In return, you use them to earn commission — FF does not pay hourly for time spent using these tools.
+
+If anything about your invoice is unclear, ask Peter BEFORE invoicing. Not after.
 
 ---
 
