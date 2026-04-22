@@ -8,6 +8,7 @@ const TABS = [
   { href: '/onboarding/phase2', label: '🎓 Phase 2' },
   { href: '/onboarding/sops',   label: '📋 SOPs' },
   { href: '/tasks',             label: '✅ Task Sheet' },
+  { href: '/resources',         label: '🎬 Resources' },
   { href: '/chat',              label: '🤖 Assistant' },
   { href: '/wellness',          label: '💙 Wellness' },
 ]
