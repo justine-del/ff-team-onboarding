@@ -31,6 +31,9 @@ export default function ResourcesPage() {
 
   const [showAddForm, setShowAddForm] = useState(false)
   const [form, setForm] = useState(BLANK_FORM)
+  const [transcript, setTranscript] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
 
@@ -65,6 +68,21 @@ export default function ResourcesPage() {
     ? resources
     : resources.filter(r => r.category === categoryFilter)
 
+  async function handleGenerate() {
+    if (!transcript.trim()) return
+    setGenerating(true)
+    setGenerateError('')
+    const res = await fetch('/api/resources/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript, loom_url: form.loom_url }),
+    })
+    const json = await res.json()
+    if (!res.ok) { setGenerateError(json.error ?? 'Generation failed'); setGenerating(false); return }
+    setForm(f => ({ ...f, title: json.title ?? f.title, description: json.description ?? f.description, category: json.category ?? f.category }))
+    setGenerating(false)
+  }
+
   async function handleAdd() {
     if (!form.title.trim()) return
     setSaving(true)
@@ -78,6 +96,7 @@ export default function ResourcesPage() {
     if (!res.ok) { setSaveError(json.error ?? 'Failed to save'); setSaving(false); return }
     setResources(prev => [...prev, json.resource])
     setForm(BLANK_FORM)
+    setTranscript('')
     setShowAddForm(false)
     setSaving(false)
   }
@@ -140,6 +159,27 @@ export default function ResourcesPage() {
         {isAdmin && showAddForm && (
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 mb-6">
             <h2 className="text-sm font-semibold text-white mb-4">New Resource</h2>
+
+            {/* Transcript → auto-generate */}
+            <div className="mb-4 bg-gray-800 border border-gray-700 rounded-xl p-4">
+              <label className="text-xs text-gray-300 font-medium mb-1 block">Paste Loom transcript to auto-fill</label>
+              <textarea
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-gray-600 resize-none"
+                rows={4}
+                placeholder="Paste transcript here, then click Generate…"
+                value={transcript}
+                onChange={e => setTranscript(e.target.value)}
+              />
+              {generateError && <p className="text-red-400 text-xs mt-1">{generateError}</p>}
+              <button
+                onClick={handleGenerate}
+                disabled={generating || !transcript.trim()}
+                className="mt-2 text-xs bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg transition-colors"
+              >
+                {generating ? 'Generating…' : '✨ Generate title & description'}
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Title *</label>
@@ -189,7 +229,7 @@ export default function ResourcesPage() {
                 {saving ? 'Saving…' : 'Save'}
               </button>
               <button
-                onClick={() => { setShowAddForm(false); setForm(BLANK_FORM); setSaveError('') }}
+                onClick={() => { setShowAddForm(false); setForm(BLANK_FORM); setTranscript(''); setSaveError(''); setGenerateError('') }}
                 className="text-sm text-gray-400 hover:text-white px-4 py-2 transition-colors"
               >
                 Cancel
