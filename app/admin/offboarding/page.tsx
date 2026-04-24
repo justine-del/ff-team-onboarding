@@ -439,10 +439,10 @@ export default function OffboardingPage() {
                 {currentStep === 2 && !vaSubmitted && (
                   <p className="text-yellow-400/80">VA has been notified and can see their form. Waiting for them to submit their portion. You can continue filling in the admin sections below.</p>
                 )}
-                {currentStep === 2 && vaSubmitted && (
-                  <p className="text-green-400">VA has submitted their portion. Review the form below, then click <strong>Complete Offboarding</strong> to disable their login.</p>
+                {currentStep === 3 && !completed && (
+                  <p className="text-green-400">VA has submitted their portion. Review the form below, then click <strong className="text-white">Complete Offboarding</strong> to disable their login.</p>
                 )}
-                {currentStep === 3 && (
+                {currentStep === 3 && completed && (
                   <p className="text-green-400">Offboarding complete. Login has been disabled.</p>
                 )}
               </div>

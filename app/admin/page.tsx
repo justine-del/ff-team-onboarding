@@ -79,7 +79,7 @@ export default function AdminPage() {
       const { data: allMembers } = await supabase
         .from('profiles')
         .select('*')
-        .eq('role', 'member')
+        .in('role', ['member', 'offboarding'])
         .eq('company_id', profile?.company_id)
         .order('created_at', { ascending: false })
 
@@ -191,7 +191,12 @@ export default function AdminPage() {
                 {members.map(member => (
                   <tr key={member.id} className="border-b border-gray-800/50 hover:bg-gray-900/50">
                     <td className="py-3 pr-4">
-                      <p className="font-medium">{member.first_name} {member.last_name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{member.first_name} {member.last_name}</p>
+                        {member.role === 'offboarding' && (
+                          <span className="text-xs bg-orange-900/50 text-orange-400 border border-orange-800/50 px-1.5 py-0.5 rounded">Offboarding</span>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-400">{member.email}</p>
                     </td>
                     <td className="py-3 pr-4 text-gray-400">{member.job_role ?? '—'}</td>
