@@ -118,6 +118,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: text })
   } catch (err) {
     console.error('Chat error:', err)
+    if (err instanceof Error) {
+      const msg = err.message.toLowerCase()
+      if (msg.includes('rate limit') || msg.includes('usage limit') || msg.includes('overloaded')) {
+        return NextResponse.json(
+          { error: "I'm temporarily unavailable due to high demand. Please try again in a few minutes." },
+          { status: 503 }
+        )
+      }
+    }
     return NextResponse.json({ error: 'Failed to get response' }, { status: 500 })
   }
 }

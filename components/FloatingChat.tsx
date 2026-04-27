@@ -47,7 +47,7 @@ export default function FloatingChat() {
         body: JSON.stringify({ messages: updated }),
       })
       const data = await res.json()
-      const botMsg: Message = { role: 'assistant', content: data.message || 'Sorry, something went wrong.' }
+      const botMsg: Message = { role: 'assistant', content: data.message || data.error || 'Sorry, something went wrong.' }
       setMessages(prev => [...prev, botMsg])
       if (!open) setUnread(true)
     } catch {

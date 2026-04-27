@@ -1,9 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
-// Monday of the current week in PHT (UTC+8), returned as YYYY-MM-DD.
-// Mondays before 6pm PHT (10am UTC) are still treated as last week —
-// members have until 5:59pm PHT to log and submit their EOW report.
+// Returns the week_start key matching what the task sheet writes to the DB.
+// The task sheet computes local (PHT) Monday midnight then calls .toISOString(),
+// which yields the Sunday UTC date (PHT Monday 00:00 = UTC Sunday 16:00).
+// So week_start in the DB is always the Sunday before the PHT Monday.
 function getWeekStartPHT(offsetWeeks = 0): string {
   const phtNow = new Date(Date.now() + 8 * 60 * 60 * 1000) // shift to PHT
   const day = phtNow.getUTCDay()   // 0=Sun, 1=Mon, …
@@ -11,6 +12,8 @@ function getWeekStartPHT(offsetWeeks = 0): string {
   const monday = new Date(phtNow)
   monday.setUTCDate(phtNow.getUTCDate() + diffToMonday + offsetWeeks * 7)
   monday.setUTCHours(0, 0, 0, 0)
+  // Subtract 1 day: PHT Monday midnight stored as Sunday UTC in the DB
+  monday.setUTCDate(monday.getUTCDate() - 1)
   return monday.toISOString().split('T')[0]
 }
 
@@ -67,20 +70,22 @@ export async function GET(req: NextRequest) {
 
   const memberList = members ?? []
 
-  // ── 4. Week start calculation sanity check ───────────────────────────────
-  // Verify the week_start used in completions matches what we calculated
+  // ── 4. Last week data sanity check ──────────────────────────────────────
+  // On Monday, verify there's at least some data from last week in the DB.
+  // (This week will always be empty first thing Monday morning.)
   if (memberList.length > 0) {
-    const { data: recentLogs } = await supabase
+    const { data: lastWeekLogs, error: lastWeekErr } = await supabase
       .from('task_completions')
       .select('week_start')
-      .order('completed_at', { ascending: false })
-      .limit(20)
+      .eq('week_start', lastWeek)
+      .gt('time_spent', 0)
+      .limit(1)
 
-    const recentWeeks = [...new Set((recentLogs ?? []).map(r => r.week_start))].slice(0, 3)
-    details.recent_week_starts_in_db = recentWeeks
-    const weekStartOk = recentWeeks.includes(thisWeek) || recentWeeks.length === 0
-    details.week_start_alignment = weekStartOk ? 'OK' : `WARNING — latest DB week (${recentWeeks[0]}) differs from expected (${thisWeek})`
-    if (!weekStartOk) issues.push(`Week start mismatch: DB has ${recentWeeks[0]}, expected ${thisWeek} — members may not be logging to the current week`)
+    if (!lastWeekErr) {
+      const hasLastWeekData = (lastWeekLogs ?? []).length > 0
+      details.last_week_has_data = hasLastWeekData ? 'OK' : `WARNING — no task completions found for week ${lastWeek}`
+      if (!hasLastWeekData) issues.push(`No task sheet data found for last week (${lastWeek}) — members may not be using the portal`)
+    }
   }
 
   // ── 5. Task sheet activity — who hasn't logged this week ─────────────────
@@ -173,6 +178,23 @@ export async function GET(req: NextRequest) {
   console.log(`[weekly-check] ${status.toUpperCase()} — ${issues.length} issue(s)`)
   if (issues.length > 0) {
     issues.forEach((issue, i) => console.warn(`  [${i + 1}] ${issue}`))
+  }
+
+  // Post to Slack via Cyborg VA bot
+  const slackToken = process.env.SLACK_BOT_TOKEN
+  if (slackToken) {
+    const icon = status === 'healthy' ? '✅' : '🚨'
+    const text = status === 'healthy'
+      ? `${icon} *Weekly system check passed* — no issues found (week starting ${thisWeek})`
+      : `${icon} *Weekly system check found ${issues.length} issue(s)* (week starting ${thisWeek})\n${issues.map((i, n) => `${n + 1}. ${i}`).join('\n')}`
+    await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${slackToken}`,
+      },
+      body: JSON.stringify({ channel: 'U075FLW1U59', text }),
+    }).catch(e => console.error('[weekly-check] Slack notify failed:', e))
   }
 
   return NextResponse.json({ status, issues, details }, { status: 200 })

@@ -53,7 +53,7 @@ export default function ChatPage() {
         body: JSON.stringify({ messages: updated }),
       })
       const data = await res.json()
-      setMessages(prev => [...prev, { role: 'assistant', content: data.message || 'Sorry, something went wrong.' }])
+      setMessages(prev => [...prev, { role: 'assistant', content: data.message || data.error || 'Sorry, something went wrong.' }])
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. Please try again.' }])
     } finally {
