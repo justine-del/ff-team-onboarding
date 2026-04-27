@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   const [completions, onetimeCompletions, customTasks, vaLinks, dayOffs, taskNotes] = await Promise.all([
     admin.from('task_completions').select('task_id, day, completed, time_spent').eq('user_id', memberId).eq('week_start', weekStart),
     admin.from('task_completions').select('task_id, day, completed, time_spent').eq('user_id', memberId).eq('week_start', '1970-01-01'),
-    admin.from('va_custom_tasks').select('*').eq('user_id', memberId).eq('active', true),
+    admin.from('va_custom_tasks').select('*').eq('user_id', memberId),
     admin.from('va_task_links').select('task_id, loom_link, sop_doc_link').eq('user_id', memberId),
     admin.from('day_off').select('day, type').eq('user_id', memberId).eq('week_start', weekStart),
     admin.from('va_task_notes').select('task_id, note').eq('user_id', memberId).eq('week_start', weekStart),
