@@ -70,7 +70,7 @@ export default async function PerformancePage() {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'admin') redirect('/dashboard')
+  if (profile?.role !== 'admin' && profile?.role !== 'super_admin') redirect('/dashboard')
 
   // Fetch members with admin client (bypasses RLS)
   const admin = createAdminClient(

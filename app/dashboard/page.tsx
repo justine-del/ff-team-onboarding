@@ -213,9 +213,9 @@ export default async function DashboardPage() {
             <Link href="/admin" className="text-sm text-blue-400 hover:text-blue-300">Admin</Link>
           )}
           {isAdminUser && (
-            <Link href="/admin/performance" className="text-sm text-purple-400 hover:text-purple-300">📊 Performance</Link>
+            <Link href="/admin/performance" className="text-sm text-purple-400 hover:text-purple-300">Performance</Link>
           )}
-          <Link href="/resources" className="text-sm text-gray-400 hover:text-white">🎬 Resources</Link>
+          <Link href="/resources" className="text-sm text-gray-400 hover:text-white">Resources</Link>
           <Link href="/guide" className="text-sm text-gray-400 hover:text-white">Guide</Link>
           <form action="/auth/signout" method="post">
             <button className="text-sm text-gray-400 hover:text-white">Sign out</button>

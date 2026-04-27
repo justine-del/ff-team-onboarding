@@ -585,7 +585,7 @@ export default function TasksPage() {
     setReportText('')
 
     const allTasks = [
-      ...DEFAULT_TASKS.filter(t => !t.is_eow).map(t => ({
+      ...DEFAULT_TASKS.filter(t => !t.is_eow && !t.is_onetime).map(t => ({
         name: t.name,
         days: t.days,
         loggedDays: Object.fromEntries(t.days.map(d => [d, completions[`${t.id}-${d}`] ?? 0])),
@@ -597,7 +597,7 @@ export default function TasksPage() {
         loggedDays: Object.fromEntries(t.days.map(d => [d, completions[`custom-${t.id}-${d}`] ?? 0])),
         totalMins: t.days.reduce((sum, d) => sum + (completions[`custom-${t.id}-${d}`] ?? 0), 0),
       })),
-    ]
+    ].filter(t => t.totalMins > 0)
 
     const name = selectedMemberId
       ? members.find(m => m.id === selectedMemberId)?.first_name + ' ' + members.find(m => m.id === selectedMemberId)?.last_name

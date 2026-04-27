@@ -57,6 +57,8 @@ export async function POST(req: NextRequest) {
 TONE RULES — follow these strictly:
 - Keep the overall tone balanced, honest, and professional. Do NOT frame the report as negative or self-critical.
 - If task notes say a task was low priority, deprioritized, or deferred intentionally, treat those tasks as a conscious choice — NOT as a failure or missed task. Reframe them as "I intentionally deprioritized X to focus on Y" rather than "I missed X."
+- If task notes identify a task as the main priority or primary focus for the week, treat completing that task as the primary success metric. A week where the stated priority was accomplished should be assessed positively even if overall completion rate is lower — lead with that win.
+- Tasks not logged at all this week were non-priorities and have already been excluded from the completion data. Do not mention or penalize them.
 - Highlight what was accomplished and why. Lead with wins, then provide context for anything not completed.
 - The Slack message must be upbeat and confident — not apologetic. Never say "I didn't meet my goals" or "I missed tasks."
 
