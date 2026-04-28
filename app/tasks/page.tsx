@@ -1039,6 +1039,37 @@ export default function TasksPage() {
         </div>
 
 
+        {/* ── DAY OFF ROW ── */}
+        {!selectedMemberId && isEditableWeek && (
+          <div className="flex items-center gap-2 mb-4 px-1">
+            <span className="text-xs text-gray-500 flex-shrink-0">Day off:</span>
+            <div className="flex gap-1.5">
+              {DAYS.map(d => {
+                const status = dayOffs[d]
+                return (
+                  <button
+                    key={d}
+                    onClick={() => toggleDayOff(d)}
+                    title={status === 'off' ? `${d}: Full day off (click to mark half day)` : status === 'half' ? `${d}: Half day off (click to clear)` : `${d}: Working (click to mark day off)`}
+                    className={`text-xs px-2 py-1 rounded transition-colors font-medium min-w-[36px] ${
+                      status === 'off'
+                        ? 'bg-red-900/60 text-red-300 border border-red-700/60 hover:bg-red-800/60'
+                        : status === 'half'
+                        ? 'bg-amber-900/60 text-amber-300 border border-amber-700/60 hover:bg-amber-800/60'
+                        : 'bg-gray-800/60 text-gray-500 border border-gray-700/40 hover:text-gray-300 hover:border-gray-600'
+                    }`}
+                  >
+                    {d}
+                    {status === 'off' && <span className="block text-[9px] leading-none mt-0.5 opacity-80">off</span>}
+                    {status === 'half' && <span className="block text-[9px] leading-none mt-0.5 opacity-80">½</span>}
+                  </button>
+                )
+              })}
+            </div>
+            <span className="text-xs text-gray-600">click to cycle: off → ½ day → clear</span>
+          </div>
+        )}
+
         {/* ── CUSTOM TASKS ── */}
         <div className="mb-6">
           <button onClick={() => toggleSection('custom')} className="w-full flex items-center justify-between px-4 py-2.5 bg-teal-950/40 border border-teal-800/50 rounded-xl mb-3 hover:bg-teal-950/60 transition-colors">
@@ -1135,12 +1166,14 @@ export default function TasksPage() {
                       <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
                       {DAYS.map(d => {
                         const isTaskDay = task.days.includes(d)
-                        const isOff = dayOffs[d] === 'off'
+                        const dayStatus = dayOffs[d]
+                        const isOff = dayStatus === 'off'
+                        const isHalf = dayStatus === 'half'
                         const key = `custom-${task.id}-${d}`
                         const mins = completions[key] ?? 0
                         const isSaving = savingCell === key
                         return (
-                          <td key={d} className={`text-center py-3 px-1 align-top ${isOff ? 'opacity-25' : ''}`}>
+                          <td key={d} className={`text-center py-3 px-1 align-top ${isOff ? 'opacity-25' : isHalf ? 'opacity-60' : ''}`}>
                             {isTaskDay && !isOff ? (
                               <TimerCell
                                 mins={mins}
@@ -1212,11 +1245,13 @@ export default function TasksPage() {
                       <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
                       {DAYS.map(d => {
                         const isTaskDay = task.days.includes(d)
-                        const isOff = dayOffs[d] === 'off'
+                        const dayStatus = dayOffs[d]
+                        const isOff = dayStatus === 'off'
+                        const isHalf = dayStatus === 'half'
                         const key = `${task.id}-${d}`
                         const checked = (completions[key] ?? 0) > 0
                         return (
-                          <td key={d} className={`text-center py-3 px-1 align-top ${isOff ? 'opacity-25' : ''}`}>
+                          <td key={d} className={`text-center py-3 px-1 align-top ${isOff ? 'opacity-25' : isHalf ? 'opacity-60' : ''}`}>
                             {isTaskDay && !isOff ? (
                               <button
                                 onClick={() => toggleEOWTask(task.id, d)}
