@@ -1013,11 +1013,6 @@ export default function TasksPage() {
             <p className="text-xs text-yellow-200/70 border-t border-gray-800 pt-3">
               <span className="font-semibold text-yellow-300">Completion:</span> Only done after sending the Communication Text (if required).
             </p>
-            {!selectedMemberId && (
-              <p className="text-xs text-teal-200/70 border-t border-gray-800 pt-3 mt-3">
-                <span className="font-semibold text-teal-300">Resets Monday 6pm PHT.</span> EOW reports due by then.
-              </p>
-            )}
           </div>
         </div>
 
