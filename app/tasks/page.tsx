@@ -1001,7 +1001,7 @@ export default function TasksPage() {
             <ol className="space-y-2 mb-3">
               {[
                 'Tasks are your full responsibility unless stated otherwise.',
-                'Complete tasks within the time windows (8am–12pm, 1pm–6pm PHT).',
+                'Complete tasks within the time windows.',
                 "If you can't complete a task, message the Founder or Manager immediately.",
                 'Anything less than the stated process is grounds for performance review.',
               ].map((rule, i) => (
