@@ -148,13 +148,15 @@ type VALink = {
 }
 
 function getMonday() {
-  const now = new Date()
-  const day = now.getDay()
+  // Anchor to PHT so the computed week_start matches the server and DB
+  // regardless of the viewer's browser timezone.
+  const PHT = 8 * 60 * 60 * 1000
+  const phtNow = new Date(Date.now() + PHT)
+  const day = phtNow.getUTCDay()
   const diff = day === 0 ? -6 : 1 - day
-  const monday = new Date(now)
-  monday.setDate(now.getDate() + diff)
-  monday.setHours(0, 0, 0, 0)
-  return monday
+  phtNow.setUTCDate(phtNow.getUTCDate() + diff)
+  phtNow.setUTCHours(0, 0, 0, 0)
+  return new Date(phtNow.getTime() - PHT)
 }
 
 type Member = { id: string; first_name: string; last_name: string; email: string }
@@ -662,15 +664,16 @@ export default function TasksPage() {
     if (!viewingId || !exportFrom || !exportTo) return
     setExporting(true)
 
-    // Snap a YYYY-MM-DD string to its Monday as a local-midnight Date object.
-    // Must NOT use toISOString() here — that converts to UTC and shifts the date for PHT users.
+    // Snap a YYYY-MM-DD string to its PHT Monday. Returns the actual UTC instant
+    // of PHT-Monday-midnight, whose toISOString().split('T')[0] matches the DB.
     function toLocalMonday(s: string): Date {
       const [y, mo, d] = s.split('-').map(Number)
-      const date = new Date(y, mo - 1, d) // local midnight, no timezone shift
-      const day = date.getDay()
-      date.setDate(date.getDate() + (day === 0 ? -6 : 1 - day))
-      date.setHours(0, 0, 0, 0)
-      return date
+      const PHT = 8 * 60 * 60 * 1000
+      const phtDate = new Date(Date.UTC(y, mo - 1, d))
+      const day = phtDate.getUTCDay()
+      phtDate.setUTCDate(phtDate.getUTCDate() + (day === 0 ? -6 : 1 - day))
+      phtDate.setUTCHours(0, 0, 0, 0)
+      return new Date(phtDate.getTime() - PHT)
     }
 
     const startDate = toLocalMonday(exportFrom)
