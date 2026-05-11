@@ -101,7 +101,7 @@ export default async function DashboardPage() {
   }
 
   const phase1Done = phase1.data?.filter(t => t.status === 'done').length ?? 0
-  const phase1Total = 18
+  const phase1Total = 24
   const phase2Done = phase2.data?.length ?? 0
   const phase2Total = 17
   const sopsD = sops.data?.length ?? 0

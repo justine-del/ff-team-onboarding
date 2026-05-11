@@ -35,12 +35,12 @@ const FOUNDER_TASKS = [
 ]
 
 const MEMBER_TASKS = [
-  { id: 101, name: 'Intro Video / Expectations',              description: 'Watch the welcome video to understand your next steps',                doc_link: 'https://docs.google.com/document/d/1VDFbrsRWthk3XkN3Vn8zCtX3ZR9MA6au7Ov4jXvnp5Q/edit?tab=t.0' },
-  { id: 102, name: 'System Access — Category A & B',          description: 'Review tool categories, confirm access, and bookmark login pages',     doc_link: 'https://docs.google.com/document/d/1D9Sim0UE3P5FMkvqlGs9JyRkgv5TpM6Y8Xi5-pEdfeM/edit?tab=t.m4wmyannxwdd#heading=h.j1225gd0vh8m' },
-  { id: 103, name: 'Slack Workspace',                         description: 'Accept Slack invite and set up your profile',                          doc_link: 'https://docs.google.com/document/d/18N5ftr0w9x3w5bZ4ToRAdsfhvhAdZ0vVy8MtWBuu5hU/edit?tab=t.2lbndwppj2og' },
-  { id: 104, name: 'SuperWhisper',                            description: 'Sign up, download the app, and configure your hotkey',                 doc_link: 'https://docs.google.com/document/d/18N5ftr0w9x3w5bZ4ToRAdsfhvhAdZ0vVy8MtWBuu5hU/edit?tab=t.i7i4b5p7oleg' },
-  { id: 105, name: 'Google Drive',                            description: 'Accept the Google Drive invite and confirm folder access',             doc_link: 'https://docs.google.com/document/d/1fSEr9f_WGQnKeiBesDOBe1jiSjQg1cfcM9rLq6-F_Uw/edit?tab=t.1jfs3ed6vpyv' },
-  { id: 106, name: 'Send Final Phase 2 Completion Message',   description: 'Post your completion message in the ramp-up thread with time taken',  doc_link: 'https://docs.google.com/document/d/1wG7u-4XwndawIFuB7MMyNkHMeP2l5LZKjk5lmGhzcew/edit?tab=t.oml35f2gtczx#heading=h.k0lg2gbadewb' },
+  { id: 19, name: 'Intro Video / Expectations',              description: 'Watch the welcome video to understand your next steps',                doc_link: 'https://docs.google.com/document/d/1VDFbrsRWthk3XkN3Vn8zCtX3ZR9MA6au7Ov4jXvnp5Q/edit?tab=t.0' },
+  { id: 20, name: 'System Access — Category A & B',          description: 'Review tool categories, confirm access, and bookmark login pages',     doc_link: 'https://docs.google.com/document/d/1D9Sim0UE3P5FMkvqlGs9JyRkgv5TpM6Y8Xi5-pEdfeM/edit?tab=t.m4wmyannxwdd#heading=h.j1225gd0vh8m' },
+  { id: 21, name: 'Slack Workspace',                         description: 'Accept Slack invite and set up your profile',                          doc_link: 'https://docs.google.com/document/d/18N5ftr0w9x3w5bZ4ToRAdsfhvhAdZ0vVy8MtWBuu5hU/edit?tab=t.2lbndwppj2og' },
+  { id: 22, name: 'SuperWhisper',                            description: 'Sign up, download the app, and configure your hotkey',                 doc_link: 'https://docs.google.com/document/d/18N5ftr0w9x3w5bZ4ToRAdsfhvhAdZ0vVy8MtWBuu5hU/edit?tab=t.i7i4b5p7oleg' },
+  { id: 23, name: 'Google Drive',                            description: 'Accept the Google Drive invite and confirm folder access',             doc_link: 'https://docs.google.com/document/d/1fSEr9f_WGQnKeiBesDOBe1jiSjQg1cfcM9rLq6-F_Uw/edit?tab=t.1jfs3ed6vpyv' },
+  { id: 24, name: 'Send Final Phase 2 Completion Message',   description: 'Post your completion message in the ramp-up thread with time taken',  doc_link: 'https://docs.google.com/document/d/1wG7u-4XwndawIFuB7MMyNkHMeP2l5LZKjk5lmGhzcew/edit?tab=t.oml35f2gtczx#heading=h.k0lg2gbadewb' },
 ]
 
 type Member = { id: string; first_name: string; last_name: string; email: string }
@@ -48,18 +48,21 @@ type Member = { id: string; first_name: string; last_name: string; email: string
 export default function Phase1Page() {
   const [completions, setCompletions] = useState<Record<number, string>>({})
   const [memberCompletions, setMemberCompletions] = useState<Record<number, boolean>>({})
+  const [userId, setUserId] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [activeTab, setActiveTab] = useState<'founder' | 'member'>('founder')
   const [loading, setLoading] = useState(true)
 
+  const MEMBER_TASK_IDS = new Set(MEMBER_TASKS.map(t => t.id))
+
   useEffect(() => {
     async function load() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-
+      setUserId(user.id)
 
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       const admin = profile?.role === 'admin'
@@ -74,18 +77,26 @@ export default function Phase1Page() {
         setMembers(allMembers ?? [])
       }
 
-      const targetId = user.id
       const { data: phase1Data } = await supabase
         .from('phase1_completion')
         .select('task_id, status')
-        .eq('user_id', targetId)
+        .eq('user_id', user.id)
 
-      const map: Record<number, string> = {}
-      phase1Data?.forEach(row => { map[row.task_id] = row.status })
-      setCompletions(map)
+      const founderMap: Record<number, string> = {}
+      const memberMap: Record<number, boolean> = {}
+      phase1Data?.forEach(row => {
+        if (MEMBER_TASK_IDS.has(row.task_id)) {
+          memberMap[row.task_id] = row.status === 'done'
+        } else {
+          founderMap[row.task_id] = row.status
+        }
+      })
+      setCompletions(founderMap)
+      setMemberCompletions(memberMap)
       setLoading(false)
     }
     load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -97,11 +108,31 @@ export default function Phase1Page() {
         .select('task_id, status')
         .eq('user_id', selectedMemberId)
       const map: Record<number, string> = {}
-      data?.forEach(row => { map[row.task_id] = row.status })
+      data?.forEach(row => {
+        if (!MEMBER_TASK_IDS.has(row.task_id)) map[row.task_id] = row.status
+      })
       setCompletions(map)
     }
     loadMemberCompletions()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMemberId])
+
+  async function toggleMemberTask(taskId: number) {
+    if (!userId) return
+    const current = memberCompletions[taskId] ?? false
+    const next = !current
+    setMemberCompletions(prev => ({ ...prev, [taskId]: next }))
+    const supabase = createClient()
+    const { error } = await supabase.from('phase1_completion').upsert({
+      user_id: userId,
+      task_id: taskId,
+      status: next ? 'done' : 'pending',
+      completed_at: next ? new Date().toISOString() : null,
+    }, { onConflict: 'user_id,task_id' })
+    if (error) {
+      setMemberCompletions(prev => ({ ...prev, [taskId]: current }))
+    }
+  }
 
   async function toggleFounderTask(taskId: number, currentStatus: string) {
     if (!isAdmin || !selectedMemberId) return
@@ -268,8 +299,9 @@ export default function Phase1Page() {
               return (
                 <div key={task.id} className={`flex items-start gap-3 p-4 rounded-xl border transition-colors ${isDone ? 'bg-green-900/20 border-green-800/50' : 'bg-gray-900 border-gray-800'}`}>
                   <button
-                    onClick={() => setMemberCompletions(prev => ({ ...prev, [task.id]: !isDone }))}
-                    className={`mt-0.5 w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center transition-colors cursor-pointer ${isDone ? 'bg-green-500 border-green-500' : 'border-gray-600 hover:border-green-400'}`}
+                    onClick={() => toggleMemberTask(task.id)}
+                    disabled={isAdmin}
+                    className={`mt-0.5 w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center transition-colors ${isDone ? 'bg-green-500 border-green-500' : 'border-gray-600'} ${isAdmin ? 'cursor-not-allowed opacity-40' : 'cursor-pointer hover:border-green-400'}`}
                   >
                     {isDone && <span className="text-white text-xs">✓</span>}
                   </button>
