@@ -338,6 +338,7 @@ export default function TasksPage() {
   const [exportFrom, setExportFrom] = useState('')
   const [exportTo, setExportTo] = useState('')
   const [exporting, setExporting] = useState(false)
+  const [recentDays, setRecentDays] = useState<Array<{ date: string; day: string; mins: number }>>([])
 
   const [viewingMonday, setViewingMonday] = useState<Date>(() => getMonday())
   const currentMonday = getMonday()
@@ -460,6 +461,69 @@ export default function TasksPage() {
     }
     loadData()
   }, [viewingId, weekStart, selectedMemberId])
+
+  // Load last 5 business days (PHT, Mon–Fri, anchored on today regardless of viewing week)
+  useEffect(() => {
+    if (!viewingId) return
+    async function loadRecentDays() {
+      const PHT = 8 * 60 * 60 * 1000
+      const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      const phtNow = new Date(Date.now() + PHT)
+
+      // Walk back from today; collect 5 Mon–Fri dates
+      const targets: Array<{ date: Date; weekStart: string; dayName: string }> = []
+      const cursor = new Date(phtNow)
+      cursor.setUTCHours(0, 0, 0, 0)
+      while (targets.length < 5) {
+        const dow = cursor.getUTCDay()
+        if (dow >= 1 && dow <= 5) {
+          const monday = new Date(cursor)
+          monday.setUTCDate(cursor.getUTCDate() + (1 - dow))
+          // Convert PHT-Monday-midnight back to actual UTC instant (matches DB week_start convention)
+          const weekStartDate = new Date(monday.getTime() - PHT)
+          targets.push({
+            date: new Date(cursor),
+            weekStart: weekStartDate.toISOString().split('T')[0],
+            dayName: DAY_NAMES[dow],
+          })
+        }
+        cursor.setUTCDate(cursor.getUTCDate() - 1)
+      }
+
+      const weekStarts = Array.from(new Set(targets.map(t => t.weekStart)))
+
+      let rows: Array<{ week_start: string; day: string; time_spent: number }> = []
+      if (selectedMemberId) {
+        const res = await fetch(`/api/admin/member-recent-hours?memberId=${selectedMemberId}&weekStarts=${weekStarts.join(',')}`)
+        if (res.ok) {
+          const json = await res.json()
+          rows = json.completions ?? []
+        }
+      } else {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('task_completions')
+          .select('week_start, day, time_spent')
+          .eq('user_id', viewingId)
+          .in('week_start', weekStarts)
+          .gt('time_spent', 0)
+        rows = data ?? []
+      }
+
+      const sums: Record<string, number> = {}
+      rows.forEach(r => {
+        const key = `${r.week_start}-${r.day}`
+        sums[key] = (sums[key] ?? 0) + (r.time_spent ?? 0)
+      })
+
+      setRecentDays(targets.map(t => ({
+        date: t.date.toISOString().split('T')[0],
+        day: t.dayName,
+        mins: sums[`${t.weekStart}-${t.dayName}`] ?? 0,
+      })))
+    }
+    loadRecentDays()
+  }, [viewingId, selectedMemberId, completions])
 
   async function setTaskTime(taskId: number, day: string, minutes: number) {
     if (!userId || !!selectedMemberId || !isEditableWeek) return
@@ -961,6 +1025,39 @@ export default function TasksPage() {
               <span className="w-2 h-2 rounded-full bg-green-500/60 inline-block"></span><span>≤4h</span>
               <span className="w-2 h-2 rounded-full bg-purple-500/60 inline-block"></span><span>4h+</span>
             </div>
+          </div>
+
+          {/* Daily Avg (last 5 business days) */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+            <p className="text-xs text-gray-400 mb-2">Daily avg (last 5 business days)</p>
+            <div className="space-y-1 mb-2">
+              {recentDays.map(d => {
+                const hours = d.mins / 60
+                const dateLabel = new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                return (
+                  <div key={d.date} className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500">{d.day}, {dateLabel}</span>
+                    <span className={hours > 0 ? 'text-gray-200 font-medium' : 'text-gray-600'}>
+                      {hours.toFixed(2)}h
+                    </span>
+                  </div>
+                )
+              })}
+              {recentDays.length === 0 && (
+                <p className="text-xs text-gray-600">No data yet.</p>
+              )}
+            </div>
+            {recentDays.length > 0 && (() => {
+              const avgHours = recentDays.reduce((s, d) => s + d.mins, 0) / 60 / recentDays.length
+              return (
+                <div className="flex items-center justify-between border-t border-gray-800 pt-2">
+                  <span className="text-xs text-gray-400">Current avg</span>
+                  <span className={`text-sm font-bold ${avgHours > 0 ? 'text-green-400' : 'text-gray-600'}`}>
+                    {avgHours.toFixed(2)}h
+                  </span>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Watch & Learn */}
