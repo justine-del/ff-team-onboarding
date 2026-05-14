@@ -30,7 +30,9 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const publicPaths = ['/login', '/update-password', '/api/weekly-check']
-  if (!user && !publicPaths.includes(pathname)) {
+  const publicPrefixes = ['/api/external/']
+  const isPublic = publicPaths.includes(pathname) || publicPrefixes.some(p => pathname.startsWith(p))
+  if (!user && !isPublic) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
