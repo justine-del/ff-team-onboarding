@@ -462,7 +462,7 @@ export default function TasksPage() {
     loadData()
   }, [viewingId, weekStart, selectedMemberId])
 
-  // Load last 5 business days (PHT, Mon–Fri, anchored on today regardless of viewing week)
+  // Load last 5 business days (PHT, Mon–Fri, excluding today, anchored regardless of viewing week)
   useEffect(() => {
     if (!viewingId) return
     async function loadRecentDays() {
@@ -470,10 +470,11 @@ export default function TasksPage() {
       const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
       const phtNow = new Date(Date.now() + PHT)
 
-      // Walk back from today; collect 5 Mon–Fri dates
+      // Walk back from yesterday; collect 5 Mon–Fri dates (excludes today)
       const targets: Array<{ date: Date; weekStart: string; dayName: string }> = []
       const cursor = new Date(phtNow)
       cursor.setUTCHours(0, 0, 0, 0)
+      cursor.setUTCDate(cursor.getUTCDate() - 1)
       while (targets.length < 5) {
         const dow = cursor.getUTCDay()
         if (dow >= 1 && dow <= 5) {
