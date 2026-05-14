@@ -462,7 +462,7 @@ export default function TasksPage() {
     loadData()
   }, [viewingId, weekStart, selectedMemberId])
 
-  // Load last 5 business days (PHT, Mon–Fri, excluding today, anchored regardless of viewing week)
+  // Load last 5 working days (PHT, excludes today, any day-of-week with logged time)
   useEffect(() => {
     if (!viewingId) return
     async function loadRecentDays() {
@@ -470,28 +470,26 @@ export default function TasksPage() {
       const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
       const phtNow = new Date(Date.now() + PHT)
 
-      // Walk back from yesterday; collect 5 Mon–Fri dates (excludes today)
-      const targets: Array<{ date: Date; weekStart: string; dayName: string }> = []
+      // Walk back from yesterday over a 28-day window (newest → oldest)
+      const candidates: Array<{ date: Date; weekStart: string; dayName: string }> = []
       const cursor = new Date(phtNow)
       cursor.setUTCHours(0, 0, 0, 0)
       cursor.setUTCDate(cursor.getUTCDate() - 1)
-      while (targets.length < 5) {
+      for (let i = 0; i < 28; i++) {
         const dow = cursor.getUTCDay()
-        if (dow >= 1 && dow <= 5) {
-          const monday = new Date(cursor)
-          monday.setUTCDate(cursor.getUTCDate() + (1 - dow))
-          // Convert PHT-Monday-midnight back to actual UTC instant (matches DB week_start convention)
-          const weekStartDate = new Date(monday.getTime() - PHT)
-          targets.push({
-            date: new Date(cursor),
-            weekStart: weekStartDate.toISOString().split('T')[0],
-            dayName: DAY_NAMES[dow],
-          })
-        }
+        const monday = new Date(cursor)
+        monday.setUTCDate(cursor.getUTCDate() + (dow === 0 ? -6 : 1 - dow))
+        // Convert PHT-Monday-midnight back to actual UTC instant (matches DB week_start convention)
+        const weekStartDate = new Date(monday.getTime() - PHT)
+        candidates.push({
+          date: new Date(cursor),
+          weekStart: weekStartDate.toISOString().split('T')[0],
+          dayName: DAY_NAMES[dow],
+        })
         cursor.setUTCDate(cursor.getUTCDate() - 1)
       }
 
-      const weekStarts = Array.from(new Set(targets.map(t => t.weekStart)))
+      const weekStarts = Array.from(new Set(candidates.map(t => t.weekStart)))
 
       let rows: Array<{ week_start: string; day: string; time_spent: number }> = []
       if (selectedMemberId) {
@@ -517,7 +515,10 @@ export default function TasksPage() {
         sums[key] = (sums[key] ?? 0) + (r.time_spent ?? 0)
       })
 
-      setRecentDays(targets.map(t => ({
+      // Pick 5 most recent days with logged time, then reverse to oldest → newest for display
+      const worked = candidates.filter(t => (sums[`${t.weekStart}-${t.dayName}`] ?? 0) > 0).slice(0, 5).reverse()
+
+      setRecentDays(worked.map(t => ({
         date: t.date.toISOString().split('T')[0],
         day: t.dayName,
         mins: sums[`${t.weekStart}-${t.dayName}`] ?? 0,
@@ -1028,9 +1029,9 @@ export default function TasksPage() {
             </div>
           </div>
 
-          {/* Daily Avg (last 5 business days) */}
+          {/* Daily Avg (last 5 working days) */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
-            <p className="text-xs text-gray-400 mb-2">Daily avg (last 5 business days)</p>
+            <p className="text-xs text-gray-400 mb-2">Daily avg (last 5 working days)</p>
             <div className="space-y-1 mb-2">
               {recentDays.map(d => {
                 const hours = d.mins / 60
