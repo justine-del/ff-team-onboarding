@@ -18,11 +18,13 @@ alter table public.va_custom_tasks enable row level security;
 create policy "Users manage own custom tasks" on public.va_custom_tasks
   for all using (auth.uid() = user_id);
 
--- VA personal links per task (personal loom/sop they attach to default tasks)
+-- VA personal links per task. task_id has no FK because custom tasks are
+-- stored as va_custom_tasks.id + 10000 (same convention as task_completions
+-- and va_task_notes); an FK to task_definitions would reject those rows.
 create table if not exists public.va_task_links (
   id serial primary key,
   user_id uuid references public.profiles(id) on delete cascade,
-  task_id int references public.task_definitions(id) on delete cascade,
+  task_id int not null,
   loom_link text default '',
   sop_doc_link text default '',
   updated_at timestamptz default now(),

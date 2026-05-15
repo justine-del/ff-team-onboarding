@@ -609,9 +609,13 @@ export default function TasksPage() {
     setSavingLink(taskId)
     const supabase = createClient()
     const draft = linkDraft[taskId] ?? { loom: '', sop: '' }
-    await supabase.from('va_task_links').upsert({ user_id: userId, task_id: taskId, loom_link: draft.loom, sop_doc_link: draft.sop, updated_at: new Date().toISOString() }, { onConflict: 'user_id,task_id' })
-    setVALinks(prev => ({ ...prev, [taskId]: { task_id: taskId, loom_link: draft.loom, sop_doc_link: draft.sop } }))
+    const { error } = await supabase.from('va_task_links').upsert({ user_id: userId, task_id: taskId, loom_link: draft.loom, sop_doc_link: draft.sop, updated_at: new Date().toISOString() }, { onConflict: 'user_id,task_id' })
     setSavingLink(null)
+    if (error) {
+      alert(`Could not save link: ${error.message}`)
+      return
+    }
+    setVALinks(prev => ({ ...prev, [taskId]: { task_id: taskId, loom_link: draft.loom, sop_doc_link: draft.sop } }))
     setExpandedLinks(null)
   }
 
