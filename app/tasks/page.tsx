@@ -412,7 +412,9 @@ export default function TasksPage() {
         const [completionData, linkData, customData, dayOffData, noteData, onetimeData] = await Promise.all([
           supabase.from('task_completions').select('task_id, day, completed, time_spent').eq('user_id', viewingId).eq('week_start', weekStart),
           supabase.from('va_task_links').select('task_id, loom_link, sop_doc_link').eq('user_id', viewingId),
-          supabase.from('va_custom_tasks').select('*').eq('user_id', viewingId).eq('active', true),
+          supabase.from('va_custom_tasks').select('*').eq('user_id', viewingId)
+          .lte('created_week_start', weekStart)
+          .or(`deactivated_week_start.is.null,deactivated_week_start.gt.${weekStart}`),
           supabase.from('day_off').select('day, type').eq('user_id', viewingId).eq('week_start', weekStart),
           supabase.from('va_task_notes').select('task_id, note').eq('user_id', viewingId).eq('week_start', weekStart),
           supabase.from('task_completions').select('task_id, day, completed, time_spent').eq('user_id', viewingId).eq('week_start', '1970-01-01'),
@@ -622,7 +624,17 @@ export default function TasksPage() {
   async function addCustomTask() {
     if (!userId || !newTask.task_name.trim()) return
     const supabase = createClient()
-    const { data } = await supabase.from('va_custom_tasks').insert({ user_id: userId, task_name: newTask.task_name, description: newTask.description, days: newTask.days, time_window: newTask.time_window, est_time: newTask.est_time, loom_link: '', sop_doc_link: '' }).select().single()
+    const { data } = await supabase.from('va_custom_tasks').insert({
+      user_id: userId,
+      task_name: newTask.task_name,
+      description: newTask.description,
+      days: newTask.days,
+      time_window: newTask.time_window,
+      est_time: newTask.est_time,
+      loom_link: '',
+      sop_doc_link: '',
+      created_week_start: weekStart,
+    }).select().single()
     if (data) setCustomTasks(prev => [...prev, data])
     setNewTask({ task_name: '', description: '', days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '', est_time: '' })
     setShowAddForm(false)
@@ -631,7 +643,11 @@ export default function TasksPage() {
   async function deleteCustomTask(id: number) {
     if (!userId) return
     const supabase = createClient()
-    await supabase.from('va_custom_tasks').update({ active: false }).eq('id', id)
+    // Mark deactivated from the viewed week onward. Past weeks keep showing
+    // this task and its logged time; current/future weeks hide it.
+    await supabase.from('va_custom_tasks')
+      .update({ active: false, deactivated_week_start: weekStart })
+      .eq('id', id)
     setCustomTasks(prev => prev.filter(t => t.id !== id))
   }
 
