@@ -313,6 +313,8 @@ export default function TasksPage() {
   const [customTasks, setCustomTasks] = useState<CustomTask[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [newTask, setNewTask] = useState({ task_name: '', description: '', days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '', est_time: '' })
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null)
+  const [editDraft, setEditDraft] = useState({ task_name: '', description: '', days: [] as string[], time_window: '', est_time: '' })
   const [savingLink, setSavingLink] = useState<number | null>(null)
   const [linkDraft, setLinkDraft] = useState<Record<number, { loom: string, sop: string }>>({})
   const [userId, setUserId] = useState<string | null>(null)
@@ -638,6 +640,17 @@ export default function TasksPage() {
     if (data) setCustomTasks(prev => [...prev, data])
     setNewTask({ task_name: '', description: '', days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '', est_time: '' })
     setShowAddForm(false)
+  }
+
+  async function updateCustomTask(id: number, fields: Partial<Pick<CustomTask, 'task_name' | 'description' | 'days' | 'time_window' | 'est_time'>>) {
+    if (!userId) return
+    const supabase = createClient()
+    const { error } = await supabase.from('va_custom_tasks').update(fields).eq('id', id)
+    if (error) {
+      alert(`Could not save: ${error.message}`)
+      return
+    }
+    setCustomTasks(prev => prev.map(t => t.id === id ? { ...t, ...fields } : t))
   }
 
   async function deleteCustomTask(id: number) {
@@ -1277,7 +1290,63 @@ export default function TasksPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {customTasks.map(task => (
+                  {customTasks.map(task => {
+                    const isEditing = editingTaskId === task.id
+                    if (isEditing) {
+                      return (
+                        <tr key={task.id} className="border-b border-gray-800/50 bg-gray-900/40">
+                          <td colSpan={DAYS.length + 3} className="py-3 px-3">
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-xs text-gray-400 mb-1">Task Name *</label>
+                                <input value={editDraft.task_name} onChange={e => setEditDraft(p => ({ ...p, task_name: e.target.value }))}
+                                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-400 mb-1">Description</label>
+                                <input value={editDraft.description} onChange={e => setEditDraft(p => ({ ...p, description: e.target.value }))}
+                                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs text-gray-400 mb-1">Time Window</label>
+                                  <input value={editDraft.time_window} onChange={e => setEditDraft(p => ({ ...p, time_window: e.target.value }))} placeholder="e.g. 8 PM EST"
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-400 mb-1">Est. Time</label>
+                                  <input value={editDraft.est_time} onChange={e => setEditDraft(p => ({ ...p, est_time: e.target.value }))} placeholder="e.g. 15 mins"
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-400 mb-2">Days</label>
+                                <div className="flex gap-2 flex-wrap">
+                                  {DAYS.map(d => (
+                                    <button key={d} type="button"
+                                      onClick={() => setEditDraft(p => ({ ...p, days: p.days.includes(d) ? p.days.filter(x => x !== d) : [...p.days, d] }))}
+                                      className={`px-2 py-1 rounded text-xs transition-colors ${editDraft.days.includes(d) ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'}`}
+                                    >{d}</button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={async () => {
+                                    if (!editDraft.task_name.trim()) return
+                                    await updateCustomTask(task.id, editDraft)
+                                    setEditingTaskId(null)
+                                  }}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                                >Save</button>
+                                <button onClick={() => setEditingTaskId(null)} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition-colors">Cancel</button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    }
+                    return (
                     <tr key={task.id} className="border-b border-gray-800/50">
                       <td className="py-3 pr-4 align-top">
                         <p className="font-medium">{task.task_name}</p>
@@ -1294,9 +1363,12 @@ export default function TasksPage() {
                         const key = `custom-${task.id}-${d}`
                         const mins = completions[key] ?? 0
                         const isSaving = savingCell === key
+                        // Preserve historical logs: if minutes were logged for this day, show the
+                        // cell even if the task's day-set has since been edited to exclude it.
+                        const showCell = (isTaskDay || mins > 0) && !isOff
                         return (
                           <td key={d} className={`text-center py-3 px-1 align-top ${isOff ? 'opacity-25' : isHalf ? 'opacity-60' : ''}`}>
-                            {isTaskDay && !isOff ? (
+                            {showCell ? (
                               <TimerCell
                                 mins={mins}
                                 disabled={!!selectedMemberId || isSaving}
@@ -1311,11 +1383,28 @@ export default function TasksPage() {
                       })}
                       <td className="py-3 align-top">
                         {!selectedMemberId && (
-                          <button onClick={() => deleteCustomTask(task.id)} className="text-gray-600 hover:text-red-400 text-xs transition-colors">✕</button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setEditDraft({
+                                  task_name: task.task_name,
+                                  description: task.description ?? '',
+                                  days: [...(task.days ?? [])],
+                                  time_window: task.time_window ?? '',
+                                  est_time: task.est_time ?? '',
+                                })
+                                setEditingTaskId(task.id)
+                              }}
+                              title="Edit task"
+                              className="text-gray-600 hover:text-blue-400 text-xs transition-colors"
+                            >✎</button>
+                            <button onClick={() => deleteCustomTask(task.id)} title="Delete task" className="text-gray-600 hover:text-red-400 text-xs transition-colors">✕</button>
+                          </div>
                         )}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
