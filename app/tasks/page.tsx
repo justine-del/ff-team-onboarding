@@ -797,9 +797,28 @@ export default function TasksPage() {
       .gt('time_spent', 0)
     const rows = data ?? []
 
+    // Fetch every custom task that overlaps the export range — not just the
+    // ones active in the currently viewed week. Without this, completions for
+    // tasks created before or deactivated during the range show up in the
+    // weekly total but their per-task rows are silently dropped.
+    let rangeCustomTasks: CustomTask[] = []
+    if (selectedMemberId) {
+      const res = await fetch(`/api/admin/member-custom-tasks?memberId=${selectedMemberId}`)
+      if (res.ok) {
+        const json = await res.json()
+        rangeCustomTasks = json.customTasks ?? []
+      }
+    } else {
+      const { data: customData } = await supabase
+        .from('va_custom_tasks')
+        .select('*')
+        .eq('user_id', viewingId)
+      rangeCustomTasks = customData ?? []
+    }
+
     const allTasks = [
       ...DEFAULT_TASKS.filter(t => !t.is_onetime).map(t => ({ key: String(t.id), name: t.name, sop: t.sop_number, days: t.days.join('/'), timeWindow: t.time_window, estTime: t.est_time })),
-      ...customTasks.map(t => ({ key: `custom-${t.id}`, name: t.task_name, sop: 'Custom', days: t.days?.join('/') ?? 'Mon–Fri', timeWindow: t.time_window ?? '', estTime: t.est_time ?? '' })),
+      ...rangeCustomTasks.map(t => ({ key: `custom-${t.id}`, name: t.task_name, sop: 'Custom', days: t.days?.join('/') ?? 'Mon–Fri', timeWindow: t.time_window ?? '', estTime: t.est_time ?? '' })),
     ]
 
     const resolvedName = selectedMemberId
@@ -837,7 +856,7 @@ export default function TasksPage() {
       const weekTotal = weekRows.reduce((s, r) => s + (r.time_spent ?? 0), 0)
 
       // Week header row
-      lines.push(`${weekLabel}  |  Total: ${(weekTotal / 60).toFixed(1)} hrs`)
+      lines.push(`${weekLabel}  |  Total: ${(weekTotal / 60).toFixed(2)} hrs`)
 
       const dTotals = new Array(7).fill(0)
 
@@ -856,18 +875,20 @@ export default function TasksPage() {
           task.estTime,
           ...dMins.map(m => m || ''),
           total,
-          (total / 60).toFixed(1),
+          (total / 60).toFixed(2),
         ].join(','))
       }
 
-      // Week subtotal row
-      lines.push(['', '', 'WEEK TOTAL', '', '', '', ...dTotals.map(m => m ? (m / 60).toFixed(1) : ''), (weekTotal / 60).toFixed(1), (weekTotal / 60).toFixed(1)].join(','))
+      // Week subtotal row — per-day cells in minutes (matches per-task rows),
+      // Total (mins) in minutes, Total (hrs) at 2 decimals so per-task hours
+      // round-trip back to the weekly sum without visible drift.
+      lines.push(['', '', 'WEEK TOTAL', '', '', '', ...dTotals.map(m => m || ''), weekTotal, (weekTotal / 60).toFixed(2)].join(','))
       lines.push('') // blank row between weeks
 
       grandTotal += weekTotal
     }
 
-    lines.push(['', '', 'GRAND TOTAL', '', '', '', '', '', '', '', '', '', '', grandTotal, (grandTotal / 60).toFixed(1)].join(','))
+    lines.push(['', '', 'GRAND TOTAL', '', '', '', '', '', '', '', '', '', '', grandTotal, (grandTotal / 60).toFixed(2)].join(','))
 
     const csv = '\ufeff' + lines.join('\n') // BOM for Excel
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
