@@ -140,6 +140,8 @@ type CustomTask = {
   est_time: string
   loom_link: string
   sop_doc_link: string
+  is_role?: boolean
+  parent_id?: number | null
 }
 
 type VALink = {
@@ -313,6 +315,9 @@ export default function TasksPage() {
   const [expandedLinks, setExpandedLinks] = useState<number | null>(null)
   const [customTasks, setCustomTasks] = useState<CustomTask[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
+  // What the add form is creating: a plain task, a role, or a sub-task under a role.
+  const [addContext, setAddContext] = useState<{ is_role?: boolean; parent_id?: number | null }>({})
+  const [expandedRoles, setExpandedRoles] = useState<Set<number>>(new Set())
   const [newTask, setNewTask] = useState({ task_name: '', description: '', days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '', est_time: '' })
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null)
   const [editDraft, setEditDraft] = useState({ task_name: '', description: '', days: [] as string[], time_window: '', est_time: '' })
@@ -641,7 +646,7 @@ export default function TasksPage() {
   async function addCustomTask() {
     if (!userId || !newTask.task_name.trim()) return
     const supabase = createClient()
-    const { data } = await supabase.from('va_custom_tasks').insert({
+    const insertRow: Record<string, unknown> = {
       user_id: userId,
       task_name: newTask.task_name,
       description: newTask.description,
@@ -651,10 +656,51 @@ export default function TasksPage() {
       loom_link: '',
       sop_doc_link: '',
       created_week_start: weekStart,
-    }).select().single()
+    }
+    // Only set the role columns when creating a role/sub-task, so plain-task
+    // creation keeps working even before the is_role/parent_id migration is run.
+    if (addContext.is_role) insertRow.is_role = true
+    if (addContext.parent_id) insertRow.parent_id = addContext.parent_id
+    const { data } = await supabase.from('va_custom_tasks').insert(insertRow).select().single()
     if (data) setCustomTasks(prev => [...prev, data])
+    // Keep a newly-created role expanded so its sub-tasks are visible.
+    if (data?.is_role) setExpandedRoles(prev => new Set(prev).add(data.id))
     setNewTask({ task_name: '', description: '', days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '', est_time: '' })
     setShowAddForm(false)
+    setAddContext({})
+  }
+
+  // Open the add form pre-set to create a plain task, a role, or a sub-task.
+  function openAdd(context: { is_role?: boolean; parent_id?: number | null }) {
+    setAddContext(context)
+    setShowAddForm(true)
+  }
+
+  function toggleRole(roleId: number) {
+    setExpandedRoles(prev => {
+      const next = new Set(prev)
+      if (next.has(roleId)) next.delete(roleId); else next.add(roleId)
+      return next
+    })
+  }
+
+  // Ordered rows for the custom-tasks table: each role, followed by its sub-tasks
+  // when expanded, then plain custom tasks. Roles and sub-tasks are both ordinary
+  // va_custom_tasks rows, so they reuse the same time-tracking row below.
+  function buildCustomRows(): { task: CustomTask; indent: boolean; isRole: boolean }[] {
+    const roles = customTasks.filter(t => t.is_role && !t.parent_id)
+    const plain = customTasks.filter(t => !t.is_role && !t.parent_id)
+    const rows: { task: CustomTask; indent: boolean; isRole: boolean }[] = []
+    for (const role of roles) {
+      rows.push({ task: role, indent: false, isRole: true })
+      if (expandedRoles.has(role.id)) {
+        for (const st of customTasks.filter(t => t.parent_id === role.id)) {
+          rows.push({ task: st, indent: true, isRole: false })
+        }
+      }
+    }
+    for (const t of plain) rows.push({ task: t, indent: false, isRole: false })
+    return rows
   }
 
   async function updateCustomTask(id: number, fields: Partial<Pick<CustomTask, 'task_name' | 'description' | 'days' | 'time_window' | 'est_time'>>) {
@@ -1439,15 +1485,21 @@ export default function TasksPage() {
           <button onClick={() => toggleSection('custom')} className="w-full flex items-center justify-between px-4 py-2.5 bg-teal-950/40 border border-teal-800/50 rounded-xl mb-3 hover:bg-teal-950/60 transition-colors">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-teal-400 flex-shrink-0"></span>
-              <span className="font-semibold text-teal-300 text-sm">My Custom Tasks</span>
-              <span className="text-xs text-teal-400/60">{customTasks.length} tasks</span>
+              <span className="font-semibold text-teal-300 text-sm">My Custom Tasks &amp; Roles</span>
+              <span className="text-xs text-teal-400/60">{customTasks.length} items</span>
             </div>
             <div className="flex items-center gap-2">
               {!selectedMemberId && (
-                <button onClick={e => { e.stopPropagation(); setShowAddForm(!showAddForm) }}
-                  className="text-xs bg-teal-800/60 hover:bg-teal-700/60 text-teal-300 px-2.5 py-1 rounded-lg transition-colors">
-                  + Add
-                </button>
+                <>
+                  <button onClick={e => { e.stopPropagation(); openAdd({}) }}
+                    className="text-xs bg-teal-800/60 hover:bg-teal-700/60 text-teal-300 px-2.5 py-1 rounded-lg transition-colors">
+                    + Task
+                  </button>
+                  <button onClick={e => { e.stopPropagation(); openAdd({ is_role: true }) }}
+                    className="text-xs bg-teal-800/60 hover:bg-teal-700/60 text-teal-300 px-2.5 py-1 rounded-lg transition-colors">
+                    + Role
+                  </button>
+                </>
               )}
               <span className="text-teal-400 text-xs">{collapsed.custom ? '▼ Show' : '▲ Hide'}</span>
             </div>
@@ -1458,7 +1510,7 @@ export default function TasksPage() {
 
           {showAddForm && (
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-4">
-              <h4 className="text-sm font-medium mb-3">New Custom Task</h4>
+              <h4 className="text-sm font-medium mb-3">{addContext.is_role ? 'New Role' : addContext.parent_id ? 'New Sub-task' : 'New Custom Task'}</h4>
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">Task Name *</label>
@@ -1494,8 +1546,8 @@ export default function TasksPage() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={addCustomTask} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">Add Task</button>
-                  <button onClick={() => setShowAddForm(false)} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition-colors">Cancel</button>
+                  <button onClick={addCustomTask} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">{addContext.is_role ? 'Add Role' : addContext.parent_id ? 'Add Sub-task' : 'Add Task'}</button>
+                  <button onClick={() => { setShowAddForm(false); setAddContext({}) }} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition-colors">Cancel</button>
                 </div>
               </div>
             </div>
@@ -1519,7 +1571,7 @@ export default function TasksPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {customTasks.map(task => {
+                  {buildCustomRows().map(({ task, indent, isRole }) => {
                     const isEditing = editingTaskId === task.id
                     if (isEditing) {
                       return (
@@ -1576,12 +1628,23 @@ export default function TasksPage() {
                       )
                     }
                     return (
-                    <tr key={task.id} className="border-b border-gray-800/50">
-                      <td className="py-3 pr-4 align-top">
-                        <p className="font-medium">{task.task_name}</p>
-                        {task.description && <p className="text-xs text-gray-400">{task.description}</p>}
+                    <tr key={task.id} className={`border-b border-gray-800/50 ${isRole ? 'bg-teal-950/20' : ''}`}>
+                      <td className="py-3 pr-4 align-top" style={indent ? { paddingLeft: '1.75rem' } : undefined}>
+                        <div className="flex items-center gap-1.5">
+                          {isRole && (
+                            <button onClick={() => toggleRole(task.id)} title="Show/hide sub-tasks" className="text-gray-500 hover:text-white text-xs w-4 flex-shrink-0">
+                              {expandedRoles.has(task.id) ? '▾' : '▸'}
+                            </button>
+                          )}
+                          <p className="font-medium">{isRole ? '🎯 ' : indent ? '↳ ' : ''}{task.task_name}</p>
+                          {isRole && <span className="text-[10px] uppercase tracking-wide text-teal-400/70 border border-teal-800/60 rounded px-1.5 py-0.5">Role</span>}
+                        </div>
+                        {task.description && <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>}
                         <LinkSection taskId={task.id + 10000} />
                         <NoteSection taskKey={`custom-${task.id}`} taskId={task.id + 10000} expandedNote={expandedNote} setExpandedNote={setExpandedNote} taskNotes={taskNotes} setTaskNotes={setTaskNotes} saveTaskNote={saveTaskNote} disabled={!!selectedMemberId} />
+                        {isRole && expandedRoles.has(task.id) && !selectedMemberId && (
+                          <button onClick={() => openAdd({ parent_id: task.id })} className="text-xs text-teal-400 hover:text-teal-300 mt-1.5 transition-colors">+ sub-task</button>
+                        )}
                       </td>
                       <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
                       {DAYS.map(d => {

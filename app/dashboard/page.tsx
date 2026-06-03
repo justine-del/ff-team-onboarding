@@ -4,11 +4,11 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import MemberStats from '@/components/stats/MemberStatsLazy'
 import VAOffboardingForm from '@/components/offboarding/VAOffboardingForm'
-import { brand } from '@/config/brand'
 import { PHASE_TOTALS, WEEKS_OF_HISTORY, TIMEZONE_OFFSET_MS } from '@/lib/constants'
 import { computePhaseGates } from '@/lib/onboarding/gating'
 import { CARD_CLASS } from '@/lib/ui'
 import ProgressBar from '@/components/ui/ProgressBar'
+import QuickNav from '@/components/nav/QuickNav'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -24,7 +24,7 @@ export default async function DashboardPage() {
   )
   const { data: profile } = await admin
     .from('profiles')
-    .select('role, first_name')
+    .select('role, first_name, guide_completed')
     .eq('id', user.id)
     .single()
 
@@ -115,10 +115,10 @@ export default async function DashboardPage() {
 
   const isNewUser = phase1Done === 0 && phase2Done === 0 && sopsD === 0
 
-  // Sequential gating for everyone: a phase unlocks only when the prior phase's
-  // checklist is fully complete. Admins/super_admins bypass (see computePhaseGates).
-  const { phase1Complete, phase2Complete } = computePhaseGates(
-    { phase1Done, phase2Done, sopsDone: sopsD },
+  // Sequential gating for everyone: Phase 0 (Guide) → Phase 1 → Phase 2 → SOPs.
+  // Each unlocks only when the prior step is done. Admins/super_admins bypass.
+  const { guideComplete, phase1Unlocked, phase1Complete, phase2Complete } = computePhaseGates(
+    { guideDone: profile?.guide_completed ?? false, phase1Done, phase2Done, sopsDone: sopsD },
     profile?.role,
   )
 
@@ -126,14 +126,34 @@ export default async function DashboardPage() {
 
   const phaseCards = (
     <>
-      <Link href="/onboarding/phase1" className={cardClass}>
+      <Link href="/guide" className={cardClass}>
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-xl">🔧</span>
-          <h3 className="font-semibold text-sm">Phase 1: System Access</h3>
+          <span className="text-xl">📖</span>
+          <h3 className="font-semibold text-sm">Phase 0: Getting Started</h3>
         </div>
-        <div className="text-xs text-gray-400 mb-1.5">{phase1Done} / {phase1Total} complete</div>
-        <ProgressBar value={phase1Done} total={phase1Total} />
+        <div className="text-xs text-gray-400">
+          {guideComplete ? '✓ Guide complete' : 'Read the guide, then mark it complete'}
+        </div>
       </Link>
+
+      {phase1Unlocked ? (
+        <Link href="/onboarding/phase1" className={cardClass}>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">🔧</span>
+            <h3 className="font-semibold text-sm">Phase 1: System Access</h3>
+          </div>
+          <div className="text-xs text-gray-400 mb-1.5">{phase1Done} / {phase1Total} complete</div>
+          <ProgressBar value={phase1Done} total={phase1Total} />
+        </Link>
+      ) : (
+        <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 opacity-60 cursor-not-allowed">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xl">🔒</span>
+            <h3 className="font-semibold text-sm text-gray-500">Phase 1: System Access</h3>
+          </div>
+          <p className="text-xs text-gray-600">Complete Getting Started to unlock</p>
+        </div>
+      )}
 
       {phase1Complete ? (
         <Link href="/onboarding/phase2" className={cardClass}>
@@ -185,22 +205,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-lg font-bold">{brand.productName}</h1>
-        <div className="flex items-center gap-4">
-          {hasAdminNav && (
-            <Link href="/admin" className="text-sm text-blue-400 hover:text-blue-300">Admin</Link>
-          )}
-          {isAdminUser && (
-            <Link href="/admin/performance" className="text-sm text-purple-400 hover:text-purple-300">Performance</Link>
-          )}
-          <Link href="/resources" className="text-sm text-gray-400 hover:text-white">Resources</Link>
-          <Link href="/guide" className="text-sm text-gray-400 hover:text-white">Guide</Link>
-          <form action="/auth/signout" method="post">
-            <button className="text-sm text-gray-400 hover:text-white">Sign out</button>
-          </form>
-        </div>
-      </nav>
+      <QuickNav isAdmin={hasAdminNav} />
 
       <main className="max-w-5xl mx-auto px-4 py-8">
         {isNewUser ? (

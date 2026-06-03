@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { brand } from '@/config/brand'
+import QuickNav from '@/components/nav/QuickNav'
+import GuideComplete from './GuideComplete'
 
 export default async function GuidePage() {
   const supabase = await createClient()
@@ -10,7 +11,7 @@ export default async function GuidePage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, first_name')
+    .select('role, first_name, guide_completed')
     .eq('id', user.id)
     .single()
 
@@ -51,15 +52,7 @@ export default async function GuidePage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">← Dashboard</Link>
-          <h1 className="text-lg font-bold">Platform Guide</h1>
-        </div>
-        {isAdmin && (
-          <Link href="/admin" className="text-sm text-blue-400 hover:text-blue-300">Admin →</Link>
-        )}
-      </nav>
+      <QuickNav isAdmin={isAdmin} />
 
       <div className="max-w-6xl mx-auto px-4 py-8 flex gap-8">
 
@@ -705,6 +698,8 @@ export default async function GuidePage() {
 
         </main>
       </div>
+
+      <GuideComplete alreadyComplete={profile?.guide_completed ?? false} isAdmin={isAdmin} />
     </div>
   )
 }

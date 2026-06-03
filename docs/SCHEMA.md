@@ -23,9 +23,15 @@ fix-rls-recursion.sql           # RLS recursion fix (see note below)
 fix-custom-task-completions.sql
 fix-va-task-links-fk.sql
 seed.sql                        # reference content (FF-specific)
-indexes.sql                     # ← NEW: performance indexes (safe, idempotent)
-drop-wellness.sql               # ← NEW: optional, removes the retired wellness table
+indexes.sql                     # performance indexes (safe, idempotent)
+drop-wellness.sql               # optional, removes the retired wellness table
+guide-and-roles.sql             # ← NEW: profiles.guide_completed; va_custom_tasks.is_role + parent_id
 ```
+
+**Batch 4 columns** (`guide-and-roles.sql`, additive/idempotent — run in the SQL editor):
+- `profiles.guide_completed boolean` — Phase 0 (Guide) gate; read alongside the existing profile row (no extra query).
+- `va_custom_tasks.is_role boolean` — a row that is a time-tracked **Role**.
+- `va_custom_tasks.parent_id int → va_custom_tasks(id)` — a sub-task's parent Role (indexed).
 
 ## Tables
 

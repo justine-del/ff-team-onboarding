@@ -87,21 +87,33 @@ alias maps to the repo root (see [tsconfig.json](../tsconfig.json)).
 
 ## Onboarding phases & gating
 
-Three sequential phases, each with its own completion table:
+Sequential steps, each gating the next:
 
-| Phase | Route | Reference table | Completion table |
+| Phase | Route | Reference | Completion |
 | --- | --- | --- | --- |
+| 0 — Getting Started (Guide) | `/guide` | static content | `profiles.guide_completed` |
 | 1 — System Access | `/onboarding/phase1` | `phase1_tasks` | `phase1_completion` |
 | 2 — Foundations | `/onboarding/phase2` | `incubator_lessons` | `lesson_completion` |
 | 2.1 — Core SOPs | `/onboarding/sops` | `sop_documents` | `sop_completion` |
 
 **Gating is the single source of truth in [lib/onboarding/gating.ts](../lib/onboarding/gating.ts).**
-A phase unlocks only when the prior phase's checklist is complete; admins bypass.
-- The **dashboard** uses `computePhaseGates()` to lock the phase cards.
-- The **phase2 / sops `layout.tsx`** files call `getPhaseContext()`
-  ([lib/onboarding/server.ts](../lib/onboarding/server.ts)) and `redirect('/dashboard')`
-  if the prerequisite isn't met — so direct URL access is blocked, not just hidden.
+A step unlocks only when the prior one is complete; admins bypass.
+- **Phase 0:** new members land on the Guide and click "Mark complete" (→ `POST /api/guide-complete` sets `profiles.guide_completed`). Phase 1 is locked until then.
+- The **dashboard** uses `computePhaseGates()` to lock the phase cards (Phase 0 → 1 → 2 → SOPs).
+- Each **`onboarding/*/layout.tsx`** (phase1, phase2, sops) calls `getPhaseContext()`
+  ([lib/onboarding/server.ts](../lib/onboarding/server.ts)) and redirects if the prerequisite
+  isn't met — direct URL access is blocked, not just hidden (phase1 → `/guide`).
+- Within a phase, items unlock sequentially via `lib/onboarding/taskGating.ts` (Mark-complete per item).
 - Thresholds live in `PHASE_TOTALS` ([lib/constants.ts](../lib/constants.ts)).
+
+**Navigation:** one universal top bar — [components/nav/QuickNav.tsx](../components/nav/QuickNav.tsx) —
+renders on every member page (brand → Getting Started, Home, phases, Task Sheet, Resources → admin links + sign out), so nothing is buried.
+
+**Task sheet roles:** besides recurring tasks, a VA can have **Roles** (`va_custom_tasks.is_role`) —
+time-tracked like a task, with optional sub-tasks (`va_custom_tasks.parent_id`) that expand/collapse
+to log at the role level or per sub-task.
+
+> **Performance note:** the Supabase DB is in **Tokyo** while the app's serverless functions run in **US-East** — every query crosses the Pacific, which dominates page-load latency. The real fix is co-locating them (move the DB to US-East, or functions to Asia). Indexes are applied; the geographic hop remains an open decision.
 
 ## External integrations (at a glance)
 
