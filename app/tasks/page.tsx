@@ -761,6 +761,7 @@ export default function TasksPage() {
 
   async function handleExportCSV() {
     if (!viewingId || !exportFrom || !exportTo) return
+    if (exportFrom > exportTo) { setExporting(false); return }
     setExporting(true)
 
     // Snap a YYYY-MM-DD string to its PHT Monday. Returns the actual UTC instant
@@ -775,18 +776,30 @@ export default function TasksPage() {
       return new Date(phtDate.getTime() - PHT)
     }
 
-    const startDate = toLocalMonday(exportFrom)
-    const endDate = toLocalMonday(exportTo)
-
-    // Collect week_starts using the same method as getMonday() in this file:
-    // local Monday midnight → toISOString() → split T[0] (gives Sunday UTC for PHT users,
-    // which is exactly what the DB stores).
+    // Walk weeks of the range. We still iterate by week_start because that's
+    // how completions are keyed in the DB, but each cell is filtered by its
+    // actual calendar date so partial weeks (e.g. May 16-17 inside the May 11
+    // week_start) only contribute the days inside the requested range.
+    const firstMonday = toLocalMonday(exportFrom)
+    const lastMonday = toLocalMonday(exportTo)
     const weekStarts: string[] = []
-    const cur = new Date(startDate)
-    while (cur <= endDate) {
+    const cur = new Date(firstMonday)
+    while (cur <= lastMonday) {
       weekStarts.push(cur.toISOString().split('T')[0])
       cur.setDate(cur.getDate() + 7)
     }
+
+    // For a given week_start string (Sun UTC = Mon PHT) and 0..6 day index,
+    // return the YYYY-MM-DD of that PHT calendar day. We add (dayIndex + 1)
+    // to the stored week_start: +1 to step from Sun UTC to Mon PHT, then the
+    // remaining offset to walk Mon→Tue→…→Sun.
+    function dayDateYMD(weekStart: string, dayIndex: number): string {
+      const [y, mo, d] = weekStart.split('-').map(Number)
+      const dt = new Date(Date.UTC(y, mo - 1, d + 1 + dayIndex))
+      return dt.toISOString().split('T')[0]
+    }
+
+    const isInRange = (ymd: string) => ymd >= exportFrom && ymd <= exportTo
 
     const supabase = createClient()
     const { data } = await supabase
@@ -825,44 +838,64 @@ export default function TasksPage() {
       ? `${members.find(m => m.id === selectedMemberId)?.first_name ?? ''} ${members.find(m => m.id === selectedMemberId)?.last_name ?? ''}`.trim()
       : memberName
 
-    // Format a local-midnight Date as "MMM D" (e.g. "Mar 16")
-    const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    const fmtFull = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    const toLocalStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-    const startStr = toLocalStr(startDate)
-    const endStr = toLocalStr(endDate)
+    // Format a YYYY-MM-DD string for display. We avoid `new Date(ymd)` parsing
+    // and explicit local-TZ paths because cells get filtered by exact date —
+    // any TZ drift here would mislabel weeks at the range boundary.
+    const fmtShortYMD = (ymd: string) => {
+      const [y, mo, d] = ymd.split('-').map(Number)
+      return new Date(Date.UTC(y, mo - 1, d)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+    }
+    const fmtFullYMD = (ymd: string) => {
+      const [y, mo, d] = ymd.split('-').map(Number)
+      return new Date(Date.UTC(y, mo - 1, d)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+    }
 
-    // Title
+    // Title uses the dates the user actually entered, not the snapped Mondays.
     const lines: string[] = [
-      `${resolvedName.toUpperCase()} — FULL TASK LOG  |  ${fmtFull(startDate)} – ${fmtFull(endDate)}`,
+      `${resolvedName.toUpperCase()} — FULL TASK LOG  |  ${fmtFullYMD(exportFrom)} – ${fmtFullYMD(exportTo)}`,
       '',
       ['Week', 'SOP #', 'Task Name', 'Schedule', 'Time Window', 'Est. Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Total (mins)', 'Total (hrs)'].join(','),
     ]
 
     let grandTotal = 0
 
-    // One block per week
-    for (let wi = 0; wi < weekStarts.length; wi++) {
-      const ws = weekStarts[wi]
-      // Derive Monday date from week_start (which is Sunday UTC for PHT = Monday local)
-      const monDate = new Date(startDate)
-      monDate.setDate(startDate.getDate() + wi * 7)
-      const sunDate = new Date(monDate)
-      sunDate.setDate(monDate.getDate() + 6)
-      const weekLabel = `${fmtShort(monDate)}–${fmtShort(sunDate)}`
+    // One block per week — but each cell is gated on whether its calendar
+    // date is inside [exportFrom, exportTo]. Partial weeks at either end of
+    // the range only contribute their in-range days, so an invoice for
+    // May 16-31 doesn't get inflated by hours logged May 11-15.
+    for (const ws of weekStarts) {
+      const inRange = [0, 1, 2, 3, 4, 5, 6].map(i => isInRange(dayDateYMD(ws, i)))
+      let firstIn = -1
+      let lastIn = -1
+      for (let i = 0; i < 7; i++) {
+        if (inRange[i]) {
+          if (firstIn === -1) firstIn = i
+          lastIn = i
+        }
+      }
+      if (firstIn === -1) continue // no days of this week fall inside the range
 
-      // Calculate week total
-      const weekRows = rows.filter(r => r.week_start === ws)
+      // Week label reflects only the in-range portion (e.g. "May 16–May 17"
+      // for the tail end of the May 11 week_start when exporting May 16-31).
+      const weekLabel = `${fmtShortYMD(dayDateYMD(ws, firstIn))}–${fmtShortYMD(dayDateYMD(ws, lastIn))}`
+
+      // Week total is the sum of in-range completions only.
+      const weekRows = rows.filter(r => {
+        if (r.week_start !== ws) return false
+        const idx = DAYS.indexOf(r.day)
+        return idx !== -1 && inRange[idx]
+      })
       const weekTotal = weekRows.reduce((s, r) => s + (r.time_spent ?? 0), 0)
 
-      // Week header row
       lines.push(`${weekLabel}  |  Total: ${(weekTotal / 60).toFixed(2)} hrs`)
 
       const dTotals = new Array(7).fill(0)
 
       for (const task of allTasks) {
         const tid = task.key.startsWith('custom-') ? 10000 + parseInt(task.key.replace('custom-', '')) : parseInt(task.key)
-        const dMins = DAYS.map(d => rows.find(r => r.task_id === tid && r.week_start === ws && r.day === d)?.time_spent ?? 0)
+        const dMins = DAYS.map((d, i) => inRange[i]
+          ? (rows.find(r => r.task_id === tid && r.week_start === ws && r.day === d)?.time_spent ?? 0)
+          : 0)
         const total = dMins.reduce((a, b) => a + b, 0)
         if (!total) continue
         dMins.forEach((m, i) => { dTotals[i] += m })
@@ -873,16 +906,15 @@ export default function TasksPage() {
           `"${task.days}"`,
           task.timeWindow,
           task.estTime,
-          ...dMins.map(m => m || ''),
+          ...dMins.map((m, i) => inRange[i] ? (m || '') : ''),
           total,
           (total / 60).toFixed(2),
         ].join(','))
       }
 
-      // Week subtotal row — per-day cells in minutes (matches per-task rows),
-      // Total (mins) in minutes, Total (hrs) at 2 decimals so per-task hours
-      // round-trip back to the weekly sum without visible drift.
-      lines.push(['', '', 'WEEK TOTAL', '', '', '', ...dTotals.map(m => m || ''), weekTotal, (weekTotal / 60).toFixed(2)].join(','))
+      // Week subtotal row — out-of-range columns stay blank so the row makes
+      // visual sense for partial weeks.
+      lines.push(['', '', 'WEEK TOTAL', '', '', '', ...dTotals.map((m, i) => inRange[i] ? (m || '') : ''), weekTotal, (weekTotal / 60).toFixed(2)].join(','))
       lines.push('') // blank row between weeks
 
       grandTotal += weekTotal
@@ -895,7 +927,7 @@ export default function TasksPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `tasksheet-${resolvedName.replace(/\s+/g, '-')}-${startStr}-to-${endStr}.csv`
+    a.download = `tasksheet-${resolvedName.replace(/\s+/g, '-')}-${exportFrom}-to-${exportTo}.csv`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -1001,7 +1033,7 @@ export default function TasksPage() {
             <p className="text-xs text-gray-400 mb-3">Select the date range to export. Includes all tasks with logged time.</p>
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">
-                <label className="text-xs text-gray-400 whitespace-nowrap">From week of</label>
+                <label className="text-xs text-gray-400 whitespace-nowrap">From date</label>
                 <input
                   type="date"
                   value={exportFrom}
@@ -1010,7 +1042,7 @@ export default function TasksPage() {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-xs text-gray-400 whitespace-nowrap">To week of</label>
+                <label className="text-xs text-gray-400 whitespace-nowrap">To date</label>
                 <input
                   type="date"
                   value={exportTo}
