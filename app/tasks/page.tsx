@@ -901,6 +901,11 @@ export default function TasksPage() {
       })
       const weekTotal = weekRows.reduce((s, r) => s + (r.time_spent ?? 0), 0)
 
+      // Skip weeks with no in-range time so partial weeks at the boundary
+      // (e.g. Sat-Sun of the May 11 week when nothing was logged those days)
+      // don't show up as empty "May 16-17 | Total: 0.00 hrs" blocks.
+      if (weekTotal === 0) continue
+
       lines.push(`${weekLabel}  |  Total: ${(weekTotal / 60).toFixed(2)} hrs`)
 
       const dTotals = new Array(7).fill(0)
