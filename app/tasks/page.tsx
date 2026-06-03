@@ -864,12 +864,79 @@ export default function TasksPage() {
       return new Date(Date.UTC(y, mo - 1, d)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
     }
 
-    // Title uses the dates the user actually entered, not the snapped Mondays.
-    const lines: string[] = [
-      `${resolvedName.toUpperCase()} — FULL TASK LOG  |  ${fmtFullYMD(exportFrom)} – ${fmtFullYMD(exportTo)}`,
-      '',
-      ['Week', 'SOP #', 'Task Name', 'Schedule', 'Time Window', 'Est. Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Total (mins)', 'Total (hrs)'].join(','),
+    // ExcelJS is heavy (~250KB) so it's loaded only when the export runs.
+    const ExcelJS = (await import('exceljs')).default
+    const wb = new ExcelJS.Workbook()
+    wb.creator = 'Cyborg VA Portal'
+    wb.created = new Date()
+    const sheet = wb.addWorksheet('Tasksheet', {
+      views: [{ state: 'frozen', ySplit: 3 }], // keep the column header visible while scrolling
+      properties: { defaultRowHeight: 18 },
+    })
+
+    // Fixed column widths — chosen empirically so the longest expected values
+    // fit without wrapping. Day columns are uniform so blocks line up cleanly.
+    sheet.columns = [
+      { key: 'week', width: 16 },
+      { key: 'sop', width: 9 },
+      { key: 'name', width: 52 },
+      { key: 'schedule', width: 22 },
+      { key: 'window', width: 13 },
+      { key: 'est', width: 10 },
+      { key: 'mon', width: 11 },
+      { key: 'tue', width: 11 },
+      { key: 'wed', width: 11 },
+      { key: 'thu', width: 11 },
+      { key: 'fri', width: 11 },
+      { key: 'sat', width: 11 },
+      { key: 'sun', width: 11 },
+      { key: 'mins', width: 12 },
+      { key: 'hrs', width: 11 },
     ]
+
+    // Palette — restrained navy + soft grays so it reads like a financial
+    // document, not a marketing brochure.
+    const C = {
+      titleFill: 'FF1A1A2E', titleText: 'FFFFFFFF',
+      colHeaderFill: 'FF2E2E48', colHeaderText: 'FFFFFFFF',
+      weekFill: 'FF3E5C8A', weekText: 'FFFFFFFF',
+      dateRowFill: 'FFEEF1F7', dateRowText: 'FF2E2E48',
+      zebra: 'FFFAFAFC',
+      weekTotalFill: 'FFE3E7F0',
+      grandTotalFill: 'FF1A1A2E', grandTotalText: 'FFFFFFFF',
+      border: 'FFCED4DC',
+    }
+    const thinBorder = { style: 'thin' as const, color: { argb: C.border } }
+    const allBorders = { top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder }
+
+    // Row 1 — Title (merged across all columns)
+    sheet.mergeCells(1, 1, 1, 15)
+    const titleCell = sheet.getCell(1, 1)
+    titleCell.value = `${resolvedName.toUpperCase()} — FULL TASK LOG`
+    titleCell.font = { name: 'Calibri', size: 14, bold: true, color: { argb: C.titleText } }
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.titleFill } }
+    titleCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 }
+    sheet.getRow(1).height = 28
+
+    // Row 2 — Date range subtitle
+    sheet.mergeCells(2, 1, 2, 15)
+    const subCell = sheet.getCell(2, 1)
+    subCell.value = `${fmtFullYMD(exportFrom)}  –  ${fmtFullYMD(exportTo)}`
+    subCell.font = { name: 'Calibri', size: 11, italic: true, color: { argb: 'FF666666' } }
+    subCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 }
+    sheet.getRow(2).height = 20
+
+    // Row 3 — Column headers (frozen)
+    const headerLabels = ['Week', 'SOP #', 'Task Name', 'Schedule', 'Time Window', 'Est. Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Total (mins)', 'Total (hrs)']
+    const colHeader = sheet.getRow(3)
+    colHeader.values = headerLabels
+    colHeader.height = 24
+    colHeader.eachCell({ includeEmpty: true }, cell => {
+      cell.font = { bold: true, color: { argb: C.colHeaderText }, size: 11 }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.colHeaderFill } }
+      cell.alignment = { vertical: 'middle', horizontal: 'center' }
+      cell.border = allBorders
+    })
 
     let grandTotal = 0
 
@@ -887,37 +954,42 @@ export default function TasksPage() {
           lastIn = i
         }
       }
-      if (firstIn === -1) continue // no days of this week fall inside the range
+      if (firstIn === -1) continue
 
-      // Week label reflects only the in-range portion (e.g. "May 16–May 17"
-      // for the tail end of the May 11 week_start when exporting May 16-31).
       const weekLabel = `${fmtShortYMD(dayDateYMD(ws, firstIn))}–${fmtShortYMD(dayDateYMD(ws, lastIn))}`
-
-      // Week total is the sum of in-range completions only.
       const weekRows = rows.filter(r => {
         if (r.week_start !== ws) return false
         const idx = DAYS.indexOf(r.day)
         return idx !== -1 && inRange[idx]
       })
       const weekTotal = weekRows.reduce((s, r) => s + (r.time_spent ?? 0), 0)
-
-      // Skip weeks with no in-range time so partial weeks at the boundary
-      // (e.g. Sat-Sun of the May 11 week when nothing was logged those days)
-      // don't show up as empty "May 16-17 | Total: 0.00 hrs" blocks.
       if (weekTotal === 0) continue
 
-      lines.push(`${weekLabel}  |  Total: ${(weekTotal / 60).toFixed(2)} hrs`)
+      // Week banner — merged across all columns
+      const weekHeaderRow = sheet.addRow([`${weekLabel}    Total: ${(weekTotal / 60).toFixed(2)} hrs`])
+      const weekRowNum = weekHeaderRow.number
+      sheet.mergeCells(weekRowNum, 1, weekRowNum, 15)
+      const wb1 = sheet.getCell(weekRowNum, 1)
+      wb1.font = { bold: true, size: 12, color: { argb: C.weekText } }
+      wb1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.weekFill } }
+      wb1.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 }
+      weekHeaderRow.height = 24
 
-      // Per-week column header that pairs each day name with its actual
-      // date (e.g. "Mon May 18", "Tue May 19"). Out-of-range day columns
-      // stay blank so the row still aligns visually with the task rows.
-      lines.push([
-        '', '', '', '', '', '',
-        ...DAYS.map((d, i) => inRange[i] ? `${d} ${fmtShortYMD(dayDateYMD(ws, i))}` : ''),
+      // Per-week day-date sub-header: "Mon" on line 1, "May 18" on line 2
+      const dateRow = sheet.addRow(['', '', '', '', '', '',
+        ...DAYS.map((d, i) => inRange[i] ? `${d}\n${fmtShortYMD(dayDateYMD(ws, i))}` : ''),
         '', '',
-      ].join(','))
+      ])
+      dateRow.height = 30
+      dateRow.eachCell({ includeEmpty: true }, (cell, col) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.dateRowFill } }
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
+        cell.font = { size: 10, color: { argb: C.dateRowText }, bold: true }
+        if (col >= 7 && col <= 13) cell.border = allBorders
+      })
 
       const dTotals = new Array(7).fill(0)
+      let zebra = false
 
       for (const task of allTasks) {
         const tid = task.key.startsWith('custom-') ? 10000 + parseInt(task.key.replace('custom-', '')) : parseInt(task.key)
@@ -927,35 +999,72 @@ export default function TasksPage() {
         const total = dMins.reduce((a, b) => a + b, 0)
         if (!total) continue
         dMins.forEach((m, i) => { dTotals[i] += m })
-        lines.push([
+
+        const row = sheet.addRow([
           weekLabel,
           task.sop,
-          `"${task.name}"`,
-          `"${task.days}"`,
+          task.name,
+          task.days,
           task.timeWindow,
           task.estTime,
-          ...dMins.map((m, i) => inRange[i] ? (m || '') : ''),
+          ...dMins.map((m, i) => inRange[i] && m ? m : null),
           total,
-          (total / 60).toFixed(2),
-        ].join(','))
+          Number((total / 60).toFixed(2)),
+        ])
+        row.height = 18
+        row.eachCell({ includeEmpty: true }, (cell, col) => {
+          if (zebra) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.zebra } }
+          cell.border = allBorders
+          if (col === 3) cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true }
+          else if (col >= 7 && col <= 15) cell.alignment = { vertical: 'middle', horizontal: 'center' }
+          else cell.alignment = { vertical: 'middle', horizontal: 'left' }
+        })
+        row.getCell(15).numFmt = '0.00'
+        zebra = !zebra
       }
 
-      // Week subtotal row — out-of-range columns stay blank so the row makes
-      // visual sense for partial weeks.
-      lines.push(['', '', 'WEEK TOTAL', '', '', '', ...dTotals.map((m, i) => inRange[i] ? (m || '') : ''), weekTotal, (weekTotal / 60).toFixed(2)].join(','))
-      lines.push('') // blank row between weeks
+      // WEEK TOTAL row — light fill, bold, totals only in numeric columns
+      const totalRow = sheet.addRow(['', '', 'WEEK TOTAL', '', '', '',
+        ...dTotals.map((m, i) => inRange[i] && m ? m : null),
+        weekTotal,
+        Number((weekTotal / 60).toFixed(2)),
+      ])
+      totalRow.height = 20
+      totalRow.eachCell({ includeEmpty: true }, (cell, col) => {
+        cell.font = { bold: true }
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.weekTotalFill } }
+        cell.border = allBorders
+        if (col >= 7 && col <= 15) cell.alignment = { vertical: 'middle', horizontal: 'center' }
+        else cell.alignment = { vertical: 'middle', horizontal: 'left' }
+      })
+      totalRow.getCell(15).numFmt = '0.00'
+
+      sheet.addRow([]) // visual gap between weeks
 
       grandTotal += weekTotal
     }
 
-    lines.push(['', '', 'GRAND TOTAL', '', '', '', '', '', '', '', '', '', '', grandTotal, (grandTotal / 60).toFixed(2)].join(','))
+    // GRAND TOTAL row — dark fill matching the title
+    const gtRow = sheet.addRow(['', '', 'GRAND TOTAL', '', '', '', '', '', '', '', '', '', '',
+      grandTotal,
+      Number((grandTotal / 60).toFixed(2)),
+    ])
+    gtRow.height = 24
+    gtRow.eachCell({ includeEmpty: true }, (cell, col) => {
+      cell.font = { bold: true, color: { argb: C.grandTotalText }, size: 12 }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.grandTotalFill } }
+      cell.border = allBorders
+      if (col >= 7 && col <= 15) cell.alignment = { vertical: 'middle', horizontal: 'center' }
+      else cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 }
+    })
+    gtRow.getCell(15).numFmt = '0.00'
 
-    const csv = '\ufeff' + lines.join('\n') // BOM for Excel
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const buf = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `tasksheet-${resolvedName.replace(/\s+/g, '-')}-${exportFrom}-to-${exportTo}.csv`
+    a.download = `tasksheet-${resolvedName.replace(/\s+/g, '-')}-${exportFrom}-to-${exportTo}.xlsx`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -1044,7 +1153,7 @@ export default function TasksPage() {
             onClick={() => { setShowExport(v => !v); setExportFrom(''); setExportTo('') }}
             className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
           >
-            Export CSV
+            Export Sheet
           </button>
           <button
             onClick={generateReport}
@@ -1120,7 +1229,7 @@ export default function TasksPage() {
                 disabled={!exportFrom || !exportTo || exporting}
                 className="text-sm bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg"
               >
-                {exporting ? 'Downloading...' : 'Download CSV'}
+                {exporting ? 'Downloading...' : 'Download Sheet'}
               </button>
               <button onClick={() => setShowExport(false)} className="text-xs text-gray-500 hover:text-gray-400">Cancel</button>
             </div>
