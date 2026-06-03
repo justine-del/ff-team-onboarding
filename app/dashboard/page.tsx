@@ -2,8 +2,12 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import MemberStats from '@/components/MemberStats'
-import VAOffboardingForm from '@/components/VAOffboardingForm'
+import MemberStats from '@/components/stats/MemberStats'
+import VAOffboardingForm from '@/components/offboarding/VAOffboardingForm'
+import { brand } from '@/config/brand'
+import { PHASE_TOTALS, WEEKS_OF_HISTORY, TIMEZONE_OFFSET_MS } from '@/lib/constants'
+import { computePhaseGates } from '@/lib/onboarding/gating'
+import { CARD_CLASS } from '@/lib/ui'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -27,7 +31,7 @@ export default async function DashboardPage() {
   // Must match the client-side getMonday() in tasks page: PHT (UTC+8) users store week_start
   // as the ISO date of Monday midnight PHT expressed in UTC, which is the previous day (Sunday).
   function getWeekStarts(n: number) {
-    const PHT = 8 * 60 * 60 * 1000
+    const PHT = TIMEZONE_OFFSET_MS
     const phtNow = new Date(Date.now() + PHT)
     const day = phtNow.getUTCDay()
     const diff = day === 0 ? -6 : 1 - day
@@ -41,7 +45,7 @@ export default async function DashboardPage() {
       return d.toISOString().split('T')[0]
     })
   }
-  const weekStarts8 = getWeekStarts(8)
+  const weekStarts8 = getWeekStarts(WEEKS_OF_HISTORY)
   const currentWeek = weekStarts8[0]
 
   // VA is in the offboarding process — show their fillable form
@@ -101,11 +105,11 @@ export default async function DashboardPage() {
   }
 
   const phase1Done = phase1.data?.filter(t => t.status === 'done').length ?? 0
-  const phase1Total = 24
+  const phase1Total = PHASE_TOTALS.phase1
   const phase2Done = phase2.data?.length ?? 0
-  const phase2Total = 17
+  const phase2Total = PHASE_TOTALS.phase2
   const sopsD = sops.data?.length ?? 0
-  const sopsTotal = 10
+  const sopsTotal = PHASE_TOTALS.sops
 
   const totalDone = phase1Done + phase2Done + sopsD
   const totalItems = phase1Total + phase2Total + sopsTotal
@@ -115,13 +119,14 @@ export default async function DashboardPage() {
 
   const isNewUser = phase1Done === 0 && phase2Done === 0 && sopsD === 0
 
-  // Maki and Josua must complete phases in order; everyone else gets all unlocked
-  const LOCKED_MEMBERS = ['maki@joburn.com', 'josua@joburn.com']
-  const isLocked = LOCKED_MEMBERS.includes(profile?.email ?? '')
-  const phase1Complete = isLocked ? phase1Done >= phase1Total : true
-  const phase2Complete = isLocked ? phase2Done >= phase2Total : true
+  // Sequential gating for everyone: a phase unlocks only when the prior phase's
+  // checklist is fully complete. Admins/super_admins bypass (see computePhaseGates).
+  const { phase1Complete, phase2Complete } = computePhaseGates(
+    { phase1Done, phase2Done, sopsDone: sopsD },
+    profile?.role,
+  )
 
-  const cardClass = "bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-gray-600 transition-colors"
+  const cardClass = CARD_CLASS
 
   const phaseCards = (
     <>
@@ -161,7 +166,7 @@ export default async function DashboardPage() {
         <Link href="/onboarding/sops" className={cardClass}>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xl">📋</span>
-            <h3 className="font-semibold text-sm">Phase 2.1: FF Core SOPs</h3>
+            <h3 className="font-semibold text-sm">Phase 2.1: Core SOPs</h3>
           </div>
           <div className="text-xs text-gray-400 mb-1.5">{sopsD} / {sopsTotal} complete</div>
           <div className="w-full bg-gray-800 rounded-full h-1.5">
@@ -185,29 +190,13 @@ export default async function DashboardPage() {
         </div>
         <div className="text-xs text-gray-400">{tasks.data?.length ?? 0} tasks checked off this week</div>
       </Link>
-
-      <Link href="/chat" className={cardClass}>
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xl">🤖</span>
-          <h3 className="font-semibold text-sm">VA Assistant</h3>
-        </div>
-        <div className="text-xs text-gray-400">Ask anything about SOPs & policies</div>
-      </Link>
-
-      <Link href="/wellness" className={cardClass}>
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xl">💙</span>
-          <h3 className="font-semibold text-sm">Wellness Check</h3>
-        </div>
-        <div className="text-xs text-gray-400">How are you feeling today?</div>
-      </Link>
     </>
   )
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-lg font-bold">Cyborg VA Portal</h1>
+        <h1 className="text-lg font-bold">{brand.productName}</h1>
         <div className="flex items-center gap-4">
           {hasAdminNav && (
             <Link href="/admin" className="text-sm text-blue-400 hover:text-blue-300">Admin</Link>

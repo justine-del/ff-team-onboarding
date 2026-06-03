@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
+import { brand } from '@/config/brand'
 
 export async function POST(request: NextRequest) {
   const { email } = await request.json()
@@ -13,7 +14,7 @@ export async function POST(request: NextRequest) {
   const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
     type: 'recovery',
     email,
-    options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ff-team-onboarding.vercel.app'}/update-password` },
+    options: { redirectTo: `${brand.siteUrl}/update-password` },
   })
 
   if (linkError) {

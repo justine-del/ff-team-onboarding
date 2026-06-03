@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import QuickNav from '@/components/QuickNav'
+import QuickNav from '@/components/nav/QuickNav'
 
 type SOP = {
   id: number

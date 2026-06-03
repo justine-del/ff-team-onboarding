@@ -1,5 +1,6 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
+import { brand } from '@/config/brand'
 
 function serviceClient() {
   return createServiceClient(
@@ -119,7 +120,7 @@ export async function POST(request: NextRequest) {
     type: 'recovery',
     email: adminEmail,
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ff-team-onboarding.vercel.app'}/update-password`,
+      redirectTo: `${brand.siteUrl}/update-password`,
     },
   })
 

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { brand } from '@/config/brand'
 
 export default async function GuidePage() {
   const supabase = await createClient()
@@ -26,7 +27,6 @@ export default async function GuidePage() {
     { id: 'task-sheet', label: '  Task Sheet' },
     { id: 'eow-tasks', label: '  EOW Tasks (Fridays)' },
     { id: 'va-assistant', label: '  VA Assistant' },
-    { id: 'wellness', label: '  Wellness Check' },
     { id: 'for-admins', label: 'For Admins' },
     { id: 'admin-dashboard', label: '  Admin Dashboard' },
     { id: 'inviting-vas', label: '  Inviting VAs' },
@@ -93,7 +93,7 @@ export default async function GuidePage() {
             <div className="inline-block bg-blue-600/20 border border-blue-600/30 text-blue-300 text-xs font-semibold px-3 py-1 rounded-full mb-4">
               Complete Platform Guide
             </div>
-            <h2 className="text-3xl font-bold mb-4">Cyborg VA Portal — How It Works</h2>
+            <h2 className="text-3xl font-bold mb-4">{brand.productName} — How It Works</h2>
             <p className="text-gray-400 leading-relaxed mb-6">
               This portal is the central hub for VA onboarding, weekly task logging, and end-of-week reporting.
               New VAs work through structured onboarding phases; active VAs use it every day to log work and stay accountable.
@@ -171,7 +171,6 @@ export default async function GuidePage() {
                     ['Phase 2.1: SOPs', 'Company policies to read. Unlocks after Phase 2.'],
                     ['My Task Sheet', 'Log your daily work. Use this every day.'],
                     ['VA Assistant', 'AI trained on your company SOPs. Ask it anything.'],
-                    ['Wellness Check', 'Quick weekly check-in on how you\'re feeling.'],
                   ].map(([title, desc]) => (
                     <div key={title} className={row}>
                       <div className="w-44 shrink-0 text-xs font-medium text-white">{title}</div>
@@ -426,23 +425,6 @@ export default async function GuidePage() {
               <p className="text-gray-500 text-xs">
                 The assistant does not see your personal task data, EOW reports, or any private information.
                 It only draws from company documents and onboarding content.
-              </p>
-            </div>
-          </div>
-
-          {/* Wellness */}
-          <div id="wellness" className="scroll-mt-8">
-            <h3 className={h3}>Wellness Check</h3>
-            <p className={sub}>A quick weekly pulse — how are you actually doing?</p>
-            <div className={prose}>
-              <p>
-                The Wellness Check is a short, optional check-in available from your dashboard.
-                It takes under a minute and gives your admin visibility into how the team is feeling —
-                not just what they&apos;re producing.
-              </p>
-              <p>
-                There are no wrong answers. Be honest. If you&apos;re burning out, under-utilized, or dealing with
-                something outside work that&apos;s affecting your output — this is a low-stakes place to flag it.
               </p>
             </div>
           </div>

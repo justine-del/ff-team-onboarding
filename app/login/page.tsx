@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { brand } from '@/config/brand'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -46,8 +47,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white">Cyborg VA</h1>
-          <p className="text-gray-400 mt-1">Funnel Futurist Team Portal</p>
+          <h1 className="text-3xl font-bold text-white">{brand.shortName}</h1>
+          <p className="text-gray-400 mt-1">{brand.companyName} {brand.tagline}</p>
         </div>
 
         <div className="bg-gray-900 rounded-2xl p-8 shadow-xl border border-gray-800">

@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import QuickNav from '@/components/QuickNav'
+import QuickNav from '@/components/nav/QuickNav'
+import { brand } from '@/config/brand'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -126,7 +127,7 @@ function buildReportHtml(reportText: string, memberName: string, weekOf: string)
     p{margin:5px 0;font-size:13px}
     footer{margin-top:40px;border-top:1px solid #ddd;padding-top:8px;font-size:11px;color:#aaa}
   </style></head><body>${body}
-  <footer>Generated via Cyborg VA Portal · ${memberName} · ${weekOf}</footer>
+  <footer>Generated via ${brand.productName} · ${memberName} · ${weekOf}</footer>
   </body></html>`
 }
 
@@ -867,7 +868,7 @@ export default function TasksPage() {
     // ExcelJS is heavy (~250KB) so it's loaded only when the export runs.
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
-    wb.creator = 'Cyborg VA Portal'
+    wb.creator = brand.productName
     wb.created = new Date()
     const sheet = wb.addWorksheet('Tasksheet', {
       views: [{ state: 'frozen', ySplit: 3 }], // keep the column header visible while scrolling

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import QuickNav from '@/components/QuickNav'
+import QuickNav from '@/components/nav/QuickNav'
 
 const BASE = 'https://docs.google.com/document/d/1ipxjN1qkppZCttHQ8JNJqhy5EJafdN830INj01BosK4/edit'
 

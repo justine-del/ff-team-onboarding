@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { brand } from '@/config/brand'
 
 type Existing = {
   last_project: string | null
@@ -57,7 +58,7 @@ export default function VAOffboardingForm({ firstName, existing }: { firstName: 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-lg font-bold">Cyborg VA Portal</h1>
+        <h1 className="text-lg font-bold">{brand.productName}</h1>
         <form action="/auth/signout" method="post">
           <button className="text-sm text-gray-400 hover:text-white">Sign out</button>
         </form>
@@ -123,7 +124,7 @@ export default function VAOffboardingForm({ firstName, existing }: { firstName: 
           <p className="text-sm font-semibold text-gray-300 uppercase tracking-wide mb-1">Final Invoice</p>
           <p className="text-xs text-gray-500 mb-4">
             Calculate your pay based on deliverables actually completed (not just what was reported). Cross-check against your Geekbot standups, then prepare the invoice using the Cyborg VA Invoice Template and send it to{' '}
-            <span className="text-white font-mono">accounting@joburn.com</span>. Fill in the summary below.
+            <span className="text-white font-mono">{brand.billingEmail}</span>. Fill in the summary below.
           </p>
           <div className="space-y-4">
             <div>

@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { brand } from '@/config/brand'
+
+const FOUNDERS = brand.founders.join(' + ')
 
 type VA = {
   id: string; email: string; first_name: string; last_name: string
@@ -223,7 +226,7 @@ export default function OffboardingPage() {
         </div>
         <div className="max-w-4xl mx-auto px-8 py-10 bg-white shadow-lg my-6">
           <div className="border-b-2 border-teal-700 pb-4 mb-6">
-            <div className="bg-teal-700 text-white px-4 py-2 rounded-t text-lg font-bold">CYBORG VA — OFFBOARDING REPORT</div>
+            <div className="bg-teal-700 text-white px-4 py-2 rounded-t text-lg font-bold">{brand.shortName.toUpperCase()} — OFFBOARDING REPORT</div>
             <div className="mt-3 flex flex-wrap gap-6 text-sm text-gray-600">
               <span><strong>Prepared:</strong> {today()}</span>
               <span><strong>Processed by:</strong> Justine</span>
@@ -285,7 +288,7 @@ export default function OffboardingPage() {
                   ['Period Covered', form.invoice_period || '—'],
                   ['Invoice Amount', form.invoice_amount ? `$${form.invoice_amount} USD` : '—'],
                   ['Payment Status', INV_STATUS[form.invoice_status] ?? form.invoice_status],
-                  ['Send To', 'accounting@joburn.com'],
+                  ['Send To', brand.billingEmail],
                   ['Approved By', 'Justine'],
                 ].map(([label, val]) => (
                   <tr key={label} className="border-b border-gray-100">
@@ -328,7 +331,7 @@ export default function OffboardingPage() {
               <tbody>
                 {[
                   ['Replacement VA Needed', form.replacement_needed ? 'Yes' : 'No'],
-                  ['Stakeholders Notified', form.notify_stakeholders ? 'Yes — John Coburn + Phoenix Bohannon' : 'No'],
+                  ['Stakeholders Notified', form.notify_stakeholders ? `Yes — ${FOUNDERS}` : 'No'],
                   ['Handoff Docs', form.handoff_docs || '—'],
                 ].map(([label, val]) => (
                   <tr key={label} className="border-b border-gray-100">
@@ -343,8 +346,8 @@ export default function OffboardingPage() {
           </section>
 
           <div className="border-t-2 border-teal-700 pt-4 text-xs text-gray-400 flex justify-between">
-            <span>Cyborg VA — Confidential Internal Record</span>
-            <span>Send invoice to: accounting@joburn.com</span>
+            <span>{brand.shortName} — Confidential Internal Record</span>
+            <span>Send invoice to: {brand.billingEmail}</span>
           </div>
         </div>
       </div>
@@ -543,7 +546,7 @@ export default function OffboardingPage() {
                 <span className="text-xs bg-yellow-900/60 text-yellow-400 border border-yellow-800/60 px-2 py-0.5 rounded">FROM VA</span>
               </div>
               <div className="bg-yellow-950/30 border border-yellow-900/40 rounded-lg p-3 mb-4 text-sm text-yellow-300/80">
-                VA prepares their invoice based on deliverables completed and sends it to <strong className="text-yellow-300">accounting@joburn.com</strong>. The details below are filled by the VA and synced here.
+                VA prepares their invoice based on deliverables completed and sends it to <strong className="text-yellow-300">{brand.billingEmail}</strong>. The details below are filled by the VA and synced here.
               </div>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
@@ -612,7 +615,7 @@ export default function OffboardingPage() {
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input type="checkbox" checked={form.notify_stakeholders} onChange={e => set('notify_stakeholders', e.target.checked)} className="w-4 h-4 rounded accent-blue-500" />
-                  <span className="text-sm text-gray-300">Notified John Coburn + Phoenix Bohannon</span>
+                  <span className="text-sm text-gray-300">Notified {FOUNDERS}</span>
                 </label>
               </div>
               <label className={labelClass}>Final Notes & Observations</label>

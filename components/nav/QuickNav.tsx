@@ -10,8 +10,6 @@ const TABS = [
   { href: '/onboarding/sops',   label: 'SOPs' },
   { href: '/tasks',             label: 'Task Sheet' },
   { href: '/resources',         label: 'Resources' },
-  { href: '/chat',              label: 'Assistant' },
-  { href: '/wellness',          label: 'Wellness' },
 ]
 
 export default function QuickNav() {
