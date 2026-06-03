@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import QuickNav from '@/components/nav/QuickNav'
+import { computeTaskStates, type TaskState } from '@/lib/onboarding/taskGating'
 
 type SOP = {
   id: number
@@ -171,6 +172,11 @@ export default function SOPsPage() {
   const criticals = sops.filter(s => s.priority === 'CRITICAL')
   const highs = sops.filter(s => s.priority === 'HIGH')
 
+  // Sequential gating (by sort_order). Admins manage SOPs, so they bypass locking.
+  const taskStates: Record<string, TaskState> = isAdmin
+    ? Object.fromEntries(sops.map(s => [String(s.id), (completions[s.id]?.completed ? 'done' : 'active') as TaskState]))
+    : computeTaskStates(sops.map(s => s.id), id => completions[id]?.completed ?? false)
+
   const inputClass = 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full'
 
   function SOPForm({ form, setForm, onSubmit, loading, onCancel, submitLabel }: {
@@ -287,7 +293,9 @@ export default function SOPsPage() {
                   <div className="space-y-2">
                     {group.items.map(sop => {
                       const data = completions[sop.id]
-                      const done = data?.completed ?? false
+                      const state = taskStates[String(sop.id)] ?? 'locked'
+                      const done = state === 'done'
+                      const locked = state === 'locked'
 
                       if (editingId === sop.id) {
                         return (
@@ -303,42 +311,59 @@ export default function SOPsPage() {
                       }
 
                       return (
-                        <div key={sop.id} className={`flex items-start gap-3 p-4 rounded-xl border transition-colors ${done ? 'bg-green-900/20 border-green-800/50' : 'bg-gray-900 border-gray-800'}`}>
-                          <button
-                            onClick={() => toggleSOP(sop.id)}
-                            className={`mt-0.5 w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center cursor-pointer transition-colors ${done ? 'bg-green-500 border-green-500' : 'border-gray-600 hover:border-green-400'}`}
-                          >
-                            {done && <span className="text-white text-xs">✓</span>}
-                          </button>
-                          <div className="flex-1">
-                            <p className="font-medium text-sm">{sop.document_name}</p>
-                            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                              {sop.link && (
-                                <a href={sop.link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">
-                                  View SOP →
-                                </a>
-                              )}
-                              {sop.est_minutes && <span className="text-xs text-gray-500">~{sop.est_minutes} mins</span>}
-                              {done && data?.completed_at && (
-                                <span className="text-xs text-green-500">✓ {formatCompletedAt(data.completed_at)}</span>
+                        <div key={sop.id} className={`p-4 rounded-xl border transition-colors ${done ? 'bg-green-900/20 border-green-800/50' : locked ? 'bg-gray-900/40 border-gray-800/50 opacity-60' : 'bg-gray-900 border-gray-700'}`}>
+                          <div className="flex items-start gap-3">
+                            <span className={`mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] ${done ? 'bg-green-500 text-white' : locked ? 'bg-gray-800 text-gray-500' : 'border-2 border-gray-600'}`}>
+                              {done ? '✓' : locked ? '🔒' : ''}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className={`font-medium text-sm ${locked ? 'text-gray-500' : ''}`}>{sop.document_name}</p>
+                              {locked ? (
+                                <p className="text-xs text-gray-600 mt-0.5">Complete the previous step to unlock</p>
+                              ) : (
+                                <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                  {sop.link && (
+                                    <a href={sop.link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">
+                                      📄 Open document →
+                                    </a>
+                                  )}
+                                  {sop.est_minutes && <span className="text-xs text-gray-500">~{sop.est_minutes} mins</span>}
+                                </div>
                               )}
                             </div>
+                            {isAdmin && (
+                              <div className="flex gap-1.5 shrink-0">
+                                <button
+                                  onClick={() => startEdit(sop)}
+                                  className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded transition-colors"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(sop.id)}
+                                  disabled={deleteLoading === sop.id}
+                                  className="text-xs bg-red-900/60 hover:bg-red-900 disabled:opacity-50 text-red-300 px-2 py-1 rounded transition-colors"
+                                >
+                                  {deleteLoading === sop.id ? '...' : 'Delete'}
+                                </button>
+                              </div>
+                            )}
                           </div>
-                          {isAdmin && (
-                            <div className="flex gap-1.5 shrink-0">
-                              <button
-                                onClick={() => startEdit(sop)}
-                                className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded transition-colors"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDelete(sop.id)}
-                                disabled={deleteLoading === sop.id}
-                                className="text-xs bg-red-900/60 hover:bg-red-900 disabled:opacity-50 text-red-300 px-2 py-1 rounded transition-colors"
-                              >
-                                {deleteLoading === sop.id ? '...' : 'Delete'}
-                              </button>
+                          {!locked && (
+                            <div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between gap-3">
+                              {done ? (
+                                <>
+                                  <span className="text-xs text-green-500">✓ Reviewed{data?.completed_at ? ` · ${formatCompletedAt(data.completed_at)}` : ''}</span>
+                                  <button onClick={() => toggleSOP(sop.id)} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">Reopen</button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => toggleSOP(sop.id)}
+                                  className="ml-auto text-sm font-medium bg-green-600 hover:bg-green-500 text-white px-4 py-1.5 rounded-lg transition-colors"
+                                >
+                                  Mark as reviewed
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>

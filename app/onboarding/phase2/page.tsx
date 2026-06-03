@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import QuickNav from '@/components/nav/QuickNav'
+import { computeTaskStates } from '@/lib/onboarding/taskGating'
 
 const BASE = 'https://docs.google.com/document/d/1ipxjN1qkppZCttHQ8JNJqhy5EJafdN830INj01BosK4/edit'
 
@@ -82,6 +83,10 @@ export default function Phase2Page() {
 
   const totalDone = LESSONS.filter(l => completions[l.id]?.completed).length
 
+  // Sequential gating: a lesson is actionable only once every lesson before it
+  // (in LESSONS order) is complete.
+  const taskStates = computeTaskStates(LESSONS.map(l => l.id), id => completions[id]?.completed ?? false)
+
   if (loading) {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">Loading...</div>
   }
@@ -120,35 +125,56 @@ export default function Phase2Page() {
                 <div className="space-y-2">
                   {lessons.map(lesson => {
                     const data = completions[lesson.id]
-                    const done = data?.completed ?? false
+                    const state = taskStates[String(lesson.id)] ?? 'locked'
+                    const done = state === 'done'
+                    const locked = state === 'locked'
                     return (
-                      <div key={lesson.id} className={`flex items-start gap-3 p-4 rounded-xl border transition-colors ${done ? 'bg-green-900/20 border-green-800/50' : 'bg-gray-900 border-gray-800'}`}>
-                        <button
-                          onClick={() => toggleLesson(lesson.id)}
-                          className={`mt-0.5 w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center cursor-pointer transition-colors ${done ? 'bg-green-500 border-green-500' : 'border-gray-600 hover:border-green-400'}`}
-                        >
-                          {done && <span className="text-white text-xs">✓</span>}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm">{lesson.name}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">{lesson.description}</p>
-                          <div className="flex items-center gap-3 mt-2 flex-wrap">
-                            {lesson.doc_link && (
-                              <a href={lesson.doc_link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">
-                                View resource →
-                              </a>
-                            )}
-                            {lesson.loom_link && (
-                              <a href={lesson.loom_link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300">
-                                {lesson.id === 17 ? 'Take quiz →' : 'Watch video →'}
-                              </a>
-                            )}
-                            <span className="text-xs text-gray-500">~{lesson.benchmark_mins} mins</span>
-                            {done && data?.completed_at && (
-                              <span className="text-xs text-green-500">✓ {formatCompletedAt(data.completed_at)}</span>
+                      <div key={lesson.id} className={`p-4 rounded-xl border transition-colors ${done ? 'bg-green-900/20 border-green-800/50' : locked ? 'bg-gray-900/40 border-gray-800/50 opacity-60' : 'bg-gray-900 border-gray-700'}`}>
+                        <div className="flex items-start gap-3">
+                          <span className={`mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] ${done ? 'bg-green-500 text-white' : locked ? 'bg-gray-800 text-gray-500' : 'border-2 border-gray-600'}`}>
+                            {done ? '✓' : locked ? '🔒' : ''}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-medium text-sm ${locked ? 'text-gray-500' : ''}`}>{lesson.name}</p>
+                            {locked ? (
+                              <p className="text-xs text-gray-600 mt-0.5">Complete the previous step to unlock</p>
+                            ) : (
+                              <>
+                                <p className="text-xs text-gray-400 mt-0.5">{lesson.description}</p>
+                                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                                  {lesson.doc_link && (
+                                    <a href={lesson.doc_link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300">
+                                      📄 Open document →
+                                    </a>
+                                  )}
+                                  {lesson.loom_link && (
+                                    <a href={lesson.loom_link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300">
+                                      {lesson.id === 17 ? 'Take quiz →' : 'Watch Loom →'}
+                                    </a>
+                                  )}
+                                  <span className="text-xs text-gray-500">~{lesson.benchmark_mins} mins</span>
+                                </div>
+                              </>
                             )}
                           </div>
                         </div>
+                        {!locked && (
+                          <div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between gap-3">
+                            {done ? (
+                              <>
+                                <span className="text-xs text-green-500">✓ Completed{data?.completed_at ? ` · ${formatCompletedAt(data.completed_at)}` : ''}</span>
+                                <button onClick={() => toggleLesson(lesson.id)} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">Reopen</button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => toggleLesson(lesson.id)}
+                                className="ml-auto text-sm font-medium bg-green-600 hover:bg-green-500 text-white px-4 py-1.5 rounded-lg transition-colors"
+                              >
+                                Mark as complete
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )
                   })}

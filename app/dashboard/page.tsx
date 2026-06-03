@@ -2,12 +2,13 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import MemberStats from '@/components/stats/MemberStats'
+import MemberStats from '@/components/stats/MemberStatsLazy'
 import VAOffboardingForm from '@/components/offboarding/VAOffboardingForm'
 import { brand } from '@/config/brand'
 import { PHASE_TOTALS, WEEKS_OF_HISTORY, TIMEZONE_OFFSET_MS } from '@/lib/constants'
 import { computePhaseGates } from '@/lib/onboarding/gating'
 import { CARD_CLASS } from '@/lib/ui'
+import ProgressBar from '@/components/ui/ProgressBar'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -136,9 +137,7 @@ export default async function DashboardPage() {
           <h3 className="font-semibold text-sm">Phase 1: System Access</h3>
         </div>
         <div className="text-xs text-gray-400 mb-1.5">{phase1Done} / {phase1Total} complete</div>
-        <div className="w-full bg-gray-800 rounded-full h-1.5">
-          <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${Math.round((phase1Done / phase1Total) * 100)}%` }} />
-        </div>
+        <ProgressBar value={phase1Done} total={phase1Total} />
       </Link>
 
       {phase1Complete ? (
@@ -148,9 +147,7 @@ export default async function DashboardPage() {
             <h3 className="font-semibold text-sm">Phase 2: Foundations</h3>
           </div>
           <div className="text-xs text-gray-400 mb-1.5">{phase2Done} / {phase2Total} complete</div>
-          <div className="w-full bg-gray-800 rounded-full h-1.5">
-            <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${Math.round((phase2Done / phase2Total) * 100)}%` }} />
-          </div>
+          <ProgressBar value={phase2Done} total={phase2Total} />
         </Link>
       ) : (
         <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 opacity-60 cursor-not-allowed">
@@ -169,15 +166,13 @@ export default async function DashboardPage() {
             <h3 className="font-semibold text-sm">Phase 2.1: Core SOPs</h3>
           </div>
           <div className="text-xs text-gray-400 mb-1.5">{sopsD} / {sopsTotal} complete</div>
-          <div className="w-full bg-gray-800 rounded-full h-1.5">
-            <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${Math.round((sopsD / sopsTotal) * 100)}%` }} />
-          </div>
+          <ProgressBar value={sopsD} total={sopsTotal} />
         </Link>
       ) : (
         <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 opacity-60 cursor-not-allowed">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xl">🔒</span>
-            <h3 className="font-semibold text-sm text-gray-500">Phase 2.1: FF Core SOPs</h3>
+            <h3 className="font-semibold text-sm text-gray-500">Phase 2.1: Core SOPs</h3>
           </div>
           <p className="text-xs text-gray-600">Complete Phase 2 to unlock</p>
         </div>

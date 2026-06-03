@@ -3,6 +3,26 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Funnel Futurist forest palette (applied via the [data-theme="dark"] block below) */
+  --ff-bg: #0a1410;
+  --ff-surface: #0f1a15;
+  --ff-surface-2: #16241d;
+  --ff-surface-3: #1f3329;
+  --ff-surface-4: #2a4435;
+  --ff-border: #25382e;
+  --ff-border-2: #2f4a3c;
+  --ff-border-3: #3a5a48;
+  --ff-text: #f4f0e3;        /* cream — headings/strong */
+  --ff-text-2: #c2cfc6;      /* light sage */
+  --ff-text-muted: #a3b1a6;  /* sage — body */
+  --ff-text-dim: #7e8e82;
+  --ff-text-faint: #5e6e62;
+  --ff-accent: #5fe0a6;      /* mint — primary */
+  --ff-accent-hi: #6fe9b0;
+  --ff-accent-hover: #4fcb93;
+  --ff-accent-2: #e9bc4f;    /* amber — secondary */
+  --ff-on-accent: #0a1410;   /* dark text on accent fills */
 }
 
 @theme inline {
@@ -88,3 +108,82 @@ body {
 
 /* theme toggle button adapts */
 [data-theme="light"] .fixed.bottom-4 { background-color: #e2e8f0 !important; border-color: #94a3b8 !important; color: #334155 !important; }
+
+/* ── Default (dark) theme — Funnel Futurist forest reskin ──────────────────
+   Recolors the app by remapping the Tailwind utilities already in the markup,
+   so positions/layout are untouched. Only color/treatment changes. */
+
+[data-theme="dark"] { color-scheme: dark; }
+
+/* page background with a soft top-left mint glow */
+[data-theme="dark"] .bg-gray-950 {
+  background-color: var(--ff-bg) !important;
+  background-image: radial-gradient(900px 520px at 15% -8%, rgb(95 224 166 / 0.06), transparent 55%) !important;
+}
+
+/* surfaces */
+[data-theme="dark"] .bg-gray-900 { background-color: var(--ff-surface) !important; }
+[data-theme="dark"] .bg-gray-900\/50 { background-color: rgb(15 26 21 / 0.5) !important; }
+[data-theme="dark"] .bg-gray-900\/40 { background-color: rgb(15 26 21 / 0.4) !important; }
+[data-theme="dark"] .bg-gray-900\/60 { background-color: rgb(15 26 21 / 0.6) !important; }
+[data-theme="dark"] .bg-gray-800 { background-color: var(--ff-surface-2) !important; }
+[data-theme="dark"] .bg-gray-800\/50 { background-color: rgb(22 36 29 / 0.5) !important; }
+[data-theme="dark"] .bg-gray-800\/60 { background-color: rgb(22 36 29 / 0.6) !important; }
+[data-theme="dark"] .bg-gray-800\/40 { background-color: rgb(22 36 29 / 0.4) !important; }
+[data-theme="dark"] .bg-gray-700 { background-color: var(--ff-surface-3) !important; }
+[data-theme="dark"] .bg-gray-600 { background-color: var(--ff-surface-4) !important; }
+
+/* borders */
+[data-theme="dark"] .border-gray-800 { border-color: var(--ff-border) !important; }
+[data-theme="dark"] .border-gray-800\/50 { border-color: rgb(37 56 46 / 0.5) !important; }
+[data-theme="dark"] .border-gray-800\/60 { border-color: rgb(37 56 46 / 0.6) !important; }
+[data-theme="dark"] .border-gray-700 { border-color: var(--ff-border-2) !important; }
+[data-theme="dark"] .border-gray-700\/50 { border-color: rgb(47 74 60 / 0.5) !important; }
+[data-theme="dark"] .border-gray-600 { border-color: var(--ff-border-3) !important; }
+[data-theme="dark"] .hover\:border-gray-600:hover { border-color: var(--ff-border-3) !important; }
+
+/* text */
+[data-theme="dark"] .text-white { color: var(--ff-text) !important; }
+[data-theme="dark"] .text-gray-300 { color: var(--ff-text-2) !important; }
+[data-theme="dark"] .text-gray-400 { color: var(--ff-text-muted) !important; }
+[data-theme="dark"] .text-gray-500 { color: var(--ff-text-dim) !important; }
+[data-theme="dark"] .text-gray-600 { color: var(--ff-text-faint) !important; }
+[data-theme="dark"] .hover\:text-white:hover { color: var(--ff-text) !important; }
+
+/* primary accent — blue → mint */
+[data-theme="dark"] .bg-blue-600 { background-color: var(--ff-accent) !important; }
+[data-theme="dark"] .bg-blue-500 { background-color: var(--ff-accent-hi) !important; }
+[data-theme="dark"] .hover\:bg-blue-700:hover { background-color: var(--ff-accent-hover) !important; }
+[data-theme="dark"] .hover\:bg-blue-500:hover { background-color: var(--ff-accent-hi) !important; }
+[data-theme="dark"] .text-blue-400 { color: var(--ff-accent) !important; }
+[data-theme="dark"] .text-blue-300 { color: #8feac0 !important; }
+[data-theme="dark"] .hover\:text-blue-300:hover { color: #8feac0 !important; }
+[data-theme="dark"] .bg-blue-950\/40 { background-color: rgb(95 224 166 / 0.08) !important; }
+[data-theme="dark"] .border-blue-800\/50 { border-color: rgb(95 224 166 / 0.30) !important; }
+[data-theme="dark"] .border-blue-800\/40 { border-color: rgb(95 224 166 / 0.25) !important; }
+
+/* success/active green → mint family (done states, progress, checks) */
+[data-theme="dark"] .bg-green-600 { background-color: var(--ff-accent) !important; }
+[data-theme="dark"] .bg-green-500 { background-color: var(--ff-accent) !important; }
+[data-theme="dark"] .hover\:bg-green-500:hover { background-color: var(--ff-accent-hi) !important; }
+[data-theme="dark"] .text-green-400 { color: var(--ff-accent) !important; }
+[data-theme="dark"] .text-green-500 { color: var(--ff-accent) !important; }
+[data-theme="dark"] .text-green-300 { color: #b9f0d6 !important; }
+
+/* secondary accent — purple links → amber */
+[data-theme="dark"] .text-purple-400 { color: var(--ff-accent-2) !important; }
+[data-theme="dark"] .text-purple-300 { color: #f0ce74 !important; }
+[data-theme="dark"] .hover\:text-purple-300:hover { color: #f0ce74 !important; }
+[data-theme="dark"] .bg-purple-600 { background-color: var(--ff-accent-2) !important; }
+[data-theme="dark"] .bg-purple-700 { background-color: var(--ff-accent-2) !important; }
+
+/* dark text on filled accent buttons (mint/amber) for contrast */
+[data-theme="dark"] .bg-blue-600.text-white,
+[data-theme="dark"] .bg-blue-500.text-white,
+[data-theme="dark"] .bg-green-600.text-white,
+[data-theme="dark"] .bg-green-500.text-white,
+[data-theme="dark"] .bg-purple-600.text-white,
+[data-theme="dark"] .bg-purple-700.text-white { color: var(--ff-on-accent) !important; }
+
+/* mint focus rings on inputs */
+[data-theme="dark"] .focus\:ring-blue-500:focus { --tw-ring-color: rgb(95 224 166 / 0.6) !important; }
