@@ -340,6 +340,20 @@ export default function TasksPage() {
   const [exportFrom, setExportFrom] = useState('')
   const [exportTo, setExportTo] = useState('')
   const [exporting, setExporting] = useState(false)
+  // Reference month for the invoice-period quick-pick buttons. Defaults to
+  // the previous month if today is in the first half of the month (typical
+  // case: invoicing on the 1st-15th for the month that just ended); current
+  // month otherwise. Use PHT-anchored "today" so VAs/admins land on the
+  // expected month no matter the browser TZ.
+  const [presetMonth, setPresetMonth] = useState<string>(() => {
+    const phtNow = new Date(Date.now() + 8 * 60 * 60 * 1000)
+    const y = phtNow.getUTCFullYear()
+    const m = phtNow.getUTCMonth() + 1 // 1..12
+    const d = phtNow.getUTCDate()
+    const refY = d <= 15 && m === 1 ? y - 1 : y
+    const refM = d <= 15 ? (m === 1 ? 12 : m - 1) : m
+    return `${refY}-${String(refM).padStart(2, '0')}`
+  })
   const [recentDays, setRecentDays] = useState<Array<{ date: string; day: string; mins: number }>>([])
 
   const [viewingMonday, setViewingMonday] = useState<Date>(() => getMonday())
@@ -1027,10 +1041,47 @@ export default function TasksPage() {
         </div>
       </nav>
 
-      {showExport && (
+      {showExport && (() => {
+        const [pY, pM] = presetMonth.split('-').map(Number)
+        const pad = (n: number) => String(n).padStart(2, '0')
+        const lastDay = pY && pM ? new Date(pY, pM, 0).getDate() : 30
+        const applyPreset = (kind: '1-15' | '16-end' | 'full' | '15-15') => {
+          if (!pY || !pM) return
+          if (kind === '1-15') {
+            setExportFrom(`${pY}-${pad(pM)}-01`)
+            setExportTo(`${pY}-${pad(pM)}-15`)
+          } else if (kind === '16-end') {
+            setExportFrom(`${pY}-${pad(pM)}-16`)
+            setExportTo(`${pY}-${pad(pM)}-${pad(lastDay)}`)
+          } else if (kind === 'full') {
+            setExportFrom(`${pY}-${pad(pM)}-01`)
+            setExportTo(`${pY}-${pad(pM)}-${pad(lastDay)}`)
+          } else {
+            // 15th of selected month → 15th of next month
+            const nextM = pM === 12 ? 1 : pM + 1
+            const nextY = pM === 12 ? pY + 1 : pY
+            setExportFrom(`${pY}-${pad(pM)}-15`)
+            setExportTo(`${nextY}-${pad(nextM)}-15`)
+          }
+        }
+        const presetBtn = "text-xs bg-gray-800 hover:bg-gray-700 text-gray-200 px-2.5 py-1.5 rounded border border-gray-700 transition-colors"
+        return (
         <div className="bg-gray-900 border-b border-gray-800 px-6 py-4">
           <div className="max-w-5xl mx-auto">
             <p className="text-xs text-gray-400 mb-3">Select the date range to export. Includes all tasks with logged time.</p>
+            <div className="flex items-center gap-2 flex-wrap mb-3">
+              <label className="text-xs text-gray-400 whitespace-nowrap">Quick pick</label>
+              <input
+                type="month"
+                value={presetMonth}
+                onChange={e => setPresetMonth(e.target.value)}
+                className="bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <button type="button" onClick={() => applyPreset('1-15')} className={presetBtn} title="Biweekly: 1st – 15th">1–15</button>
+              <button type="button" onClick={() => applyPreset('16-end')} className={presetBtn} title={`Biweekly: 16th – ${lastDay}th`}>16–{lastDay}</button>
+              <button type="button" onClick={() => applyPreset('full')} className={presetBtn} title={`Full month: 1st – ${lastDay}th`}>Full month</button>
+              <button type="button" onClick={() => applyPreset('15-15')} className={presetBtn} title="15th → 15th of next month">15 → 15</button>
+            </div>
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">
                 <label className="text-xs text-gray-400 whitespace-nowrap">From date</label>
@@ -1061,7 +1112,8 @@ export default function TasksPage() {
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
 
       <QuickNav />
 
