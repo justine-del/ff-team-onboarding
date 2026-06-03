@@ -908,6 +908,15 @@ export default function TasksPage() {
 
       lines.push(`${weekLabel}  |  Total: ${(weekTotal / 60).toFixed(2)} hrs`)
 
+      // Per-week column header that pairs each day name with its actual
+      // date (e.g. "Mon May 18", "Tue May 19"). Out-of-range day columns
+      // stay blank so the row still aligns visually with the task rows.
+      lines.push([
+        '', '', '', '', '', '',
+        ...DAYS.map((d, i) => inRange[i] ? `${d} ${fmtShortYMD(dayDateYMD(ws, i))}` : ''),
+        '', '',
+      ].join(','))
+
       const dTotals = new Array(7).fill(0)
 
       for (const task of allTasks) {
