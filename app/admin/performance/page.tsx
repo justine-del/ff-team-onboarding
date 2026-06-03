@@ -90,16 +90,27 @@ export default async function PerformancePage() {
   const wednesdayOrLater = isWednesdayOrLater()
   const workdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
 
-  const memberStats: MemberStat[] = await Promise.all(
-    (members ?? []).map(async (member) => {
-      const { data: completions } = await admin
+  // Single batched query for ALL members (was one query per member — N+1).
+  // Scales flat: 5 members or 500, this is one round-trip. Grouped in memory below.
+  const memberIds = (members ?? []).map(m => m.id)
+  const { data: allCompletions } = memberIds.length
+    ? await admin
         .from('task_completions')
-        .select('week_start, day, time_spent')
-        .eq('user_id', member.id)
+        .select('user_id, week_start, day, time_spent')
+        .in('user_id', memberIds)
         .in('week_start', weekStarts)
         .gt('time_spent', 0)
+    : { data: [] as { user_id: string; week_start: string; day: string; time_spent: number | null }[] }
 
-      const rows = completions ?? []
+  const rowsByUser = new Map<string, { week_start: string; day: string; time_spent: number | null }[]>()
+  for (const row of allCompletions ?? []) {
+    const list = rowsByUser.get(row.user_id) ?? []
+    list.push(row)
+    rowsByUser.set(row.user_id, list)
+  }
+
+  const memberStats: MemberStat[] = (members ?? []).map((member) => {
+      const rows = rowsByUser.get(member.id) ?? []
 
       // Count unique (week_start, day) pairs for workdays only
       const uniquePairs = new Set(
@@ -157,7 +168,6 @@ export default async function PerformancePage() {
         note,
       }
     })
-  )
 
   // Sort: needs-attention → inconsistent → active
   const sorted = [...memberStats].sort(

@@ -24,7 +24,7 @@ export default async function DashboardPage() {
   )
   const { data: profile } = await admin
     .from('profiles')
-    .select('*')
+    .select('role, first_name')
     .eq('id', user.id)
     .single()
 
@@ -77,22 +77,17 @@ export default async function DashboardPage() {
   let teamStats: { active: number; inconsistent: number; needsAttention: number; noActivity: number } | null = null
   if (isAdminUser && allMembers.data && allMembers.data.length > 0) {
     const memberIds = allMembers.data.map((m: { id: string }) => m.id)
-    const { data: thisWeekRows } = await admin
+    // One query for both weeks (was two sequential round-trips), split in memory.
+    const lastWeekStart = weekStarts8[1]
+    const { data: weekRows } = await admin
       .from('task_completions')
-      .select('user_id, time_spent')
+      .select('user_id, week_start, time_spent')
       .in('user_id', memberIds)
-      .eq('week_start', currentWeek)
+      .in('week_start', [currentWeek, lastWeekStart])
       .gt('time_spent', 0)
 
-    const { data: lastWeekRows } = await admin
-      .from('task_completions')
-      .select('user_id, time_spent')
-      .in('user_id', memberIds)
-      .eq('week_start', weekStarts8[1])
-      .gt('time_spent', 0)
-
-    const thisWeekActive = new Set(thisWeekRows?.map(r => r.user_id) ?? [])
-    const lastWeekActive = new Set(lastWeekRows?.map(r => r.user_id) ?? [])
+    const thisWeekActive = new Set((weekRows ?? []).filter(r => r.week_start === currentWeek).map(r => r.user_id))
+    const lastWeekActive = new Set((weekRows ?? []).filter(r => r.week_start === lastWeekStart).map(r => r.user_id))
 
     let active = 0, inconsistent = 0, needsAttention = 0, noActivity = 0
     for (const id of memberIds) {
