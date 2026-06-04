@@ -24,12 +24,11 @@ function formatTime(mins: number): string {
   return m > 0 ? `${h}h${m}m` : `${h}h`
 }
 
+// One calm style: empty vs filled. (Dropped the 4-color yellow/blue/green/purple
+// tiers — they were visual noise; the number + time label convey the amount.)
 function timeBadgeClass(mins: number): string {
-  if (!mins) return 'bg-gray-800/50 border-gray-700 text-gray-600'
-  if (mins <= 30) return 'bg-yellow-900/40 border-yellow-700/50 text-yellow-300'
-  if (mins <= 90) return 'bg-blue-900/40 border-blue-700/50 text-blue-300'
-  if (mins <= 240) return 'bg-green-900/40 border-green-700/50 text-green-300'
-  return 'bg-purple-900/40 border-purple-700/50 text-purple-300'
+  if (!mins) return 'bg-gray-800/40 border-gray-700/60 text-gray-600'
+  return 'bg-green-900/25 border-green-800/50 text-green-200'
 }
 
 function buildSemanticHtml(reportText: string): string {
@@ -228,7 +227,7 @@ function TimerCell({ mins, disabled, onSave, completionKey }: {
         onBlur={() => commit(inputVal)}
         onKeyDown={e => { if (e.key === 'Enter') { commit(inputVal); (e.target as HTMLInputElement).blur() } }}
         disabled={disabled}
-        className={`w-12 text-center text-xs rounded px-1 py-0.5 border focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${timeBadgeClass(mins)} ${disabled ? 'opacity-70 cursor-default' : ''}`}
+        className={`w-14 text-center text-sm rounded-md px-1 py-1 border focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${timeBadgeClass(mins)} ${disabled ? 'opacity-70 cursor-default' : ''}`}
       />
       {mins > 0 && <span className="text-[9px] text-gray-500 leading-none">{formatTime(mins)}</span>}
       {!disabled && (
@@ -550,7 +549,11 @@ export default function TasksPage() {
       })))
     }
     loadRecentDays()
-  }, [viewingId, selectedMemberId, completions])
+    // NB: intentionally NOT keyed on `completions` — loadRecentDays issues its
+    // own query and never reads completion state. Depending on it serialized
+    // this load behind the main fetch (a waterfall) and re-ran it on every time
+    // entry. Keyed only on the member/week so it runs in parallel with loadData.
+  }, [viewingId, selectedMemberId])
 
   async function setTaskTime(taskId: number, day: string, minutes: number) {
     if (!userId || !!selectedMemberId || !isEditableWeek) return
@@ -1268,8 +1271,8 @@ export default function TasksPage() {
       })()}
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
-          <h1 className="text-xl font-bold">My Task Sheet</h1>
+        <div className="flex items-center justify-between mb-8 gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold">My Task Sheet</h1>
           <div className="flex items-center gap-2">
             <button
               onClick={() => { setShowExport(v => !v); setExportFrom(''); setExportTo('') }}
@@ -1326,12 +1329,7 @@ export default function TasksPage() {
               <span className="text-xs text-gray-400">Hours this week</span>
               <span className={`text-sm font-bold ${weeklyMinutes > 0 ? 'text-green-400' : 'text-gray-600'}`}>{weeklyHours}h</span>
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-600 flex-wrap">
-              <span className="w-2 h-2 rounded-full bg-yellow-500/60 inline-block"></span><span>≤30m</span>
-              <span className="w-2 h-2 rounded-full bg-blue-500/60 inline-block"></span><span>≤90m</span>
-              <span className="w-2 h-2 rounded-full bg-green-500/60 inline-block"></span><span>≤4h</span>
-              <span className="w-2 h-2 rounded-full bg-purple-500/60 inline-block"></span><span>4h+</span>
-            </div>
+            <p className="text-xs text-gray-600">Minutes logged per task per day. Use <span className="text-gray-400">▶ track</span> to time it live.</p>
           </div>
 
           {/* Daily Avg (last 5 working days) */}
@@ -1367,8 +1365,31 @@ export default function TasksPage() {
             })()}
           </div>
 
-          {/* Watch & Learn */}
-          <div className="bg-gray-900 border border-green-800/30 rounded-xl p-4">
+          {/* Guidelines (Must Read — surfaced above the optional Watch & Learn) */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="text-sm font-semibold text-gray-200">Guidelines</h3>
+              <span className="text-xs font-medium bg-red-900/50 text-red-300 border border-red-700/40 px-1.5 py-0.5 rounded-full ml-auto">Must Read</span>
+            </div>
+            <ol className="space-y-2 mb-3">
+              {[
+                'Tasks are your full responsibility unless stated otherwise.',
+                'Complete tasks within the time windows.',
+                "If you can't complete a task, message the Founder or Manager immediately.",
+                'Anything less than the stated process is grounds for performance review.',
+              ].map((rule, i) => (
+                <li key={i} className="text-xs text-gray-400 flex gap-2">
+                  <span className="font-bold text-gray-300 flex-shrink-0">{i + 1}.</span><span>{rule}</span>
+                </li>
+              ))}
+            </ol>
+            <p className="text-xs text-yellow-200/70 border-t border-gray-800 pt-3">
+              <span className="font-semibold text-yellow-300">Completion:</span> Only done after sending the Communication Text (if required).
+            </p>
+          </div>
+
+          {/* Watch & Learn (optional one-time) */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0"></span>
               <h3 className="text-sm font-semibold text-green-300">Watch & Learn</h3>
@@ -1397,29 +1418,6 @@ export default function TasksPage() {
                 )
               })}
             </div>
-          </div>
-
-          {/* Guidelines */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <h3 className="text-sm font-semibold text-gray-200">Guidelines</h3>
-              <span className="text-xs font-medium bg-red-900/50 text-red-300 border border-red-700/40 px-1.5 py-0.5 rounded-full ml-auto">Must Read</span>
-            </div>
-            <ol className="space-y-2 mb-3">
-              {[
-                'Tasks are your full responsibility unless stated otherwise.',
-                'Complete tasks within the time windows.',
-                "If you can't complete a task, message the Founder or Manager immediately.",
-                'Anything less than the stated process is grounds for performance review.',
-              ].map((rule, i) => (
-                <li key={i} className="text-xs text-gray-400 flex gap-2">
-                  <span className="font-bold text-gray-300 flex-shrink-0">{i + 1}.</span><span>{rule}</span>
-                </li>
-              ))}
-            </ol>
-            <p className="text-xs text-yellow-200/70 border-t border-gray-800 pt-3">
-              <span className="font-semibold text-yellow-300">Completion:</span> Only done after sending the Communication Text (if required).
-            </p>
           </div>
         </div>
 
@@ -1633,7 +1631,7 @@ export default function TasksPage() {
                               {expandedRoles.has(task.id) ? '▾' : '▸'}
                             </button>
                           )}
-                          <p className="font-medium">{isRole ? '🎯 ' : indent ? '↳ ' : ''}{task.task_name}</p>
+                          <p className="font-medium">{indent ? <span className="text-gray-600">└ </span> : ''}{task.task_name}</p>
                           {isRole && <span className="text-[10px] uppercase tracking-wide text-teal-400/70 border border-teal-800/60 rounded px-1.5 py-0.5">Role</span>}
                         </div>
                         {task.description && <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>}
