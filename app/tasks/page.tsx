@@ -389,7 +389,8 @@ export default function TasksPage() {
   useEffect(() => {
     async function load() {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user ?? null
       if (!user) return
       setUserId(user.id)
 
@@ -1190,26 +1191,7 @@ export default function TasksPage() {
   return (
     <>
     <div className="min-h-screen bg-gray-950 text-white">
-      <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">← Dashboard</Link>
-          <h1 className="text-lg font-bold">My Task Sheet</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setShowExport(v => !v); setExportFrom(''); setExportTo('') }}
-            className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            Export Sheet
-          </button>
-          <button
-            onClick={generateReport}
-            className="text-sm bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            Generate EOW Report
-          </button>
-        </div>
-      </nav>
+      <QuickNav />
 
       {showExport && (() => {
         const [pY, pM] = presetMonth.split('-').map(Number)
@@ -1285,9 +1267,24 @@ export default function TasksPage() {
         )
       })()}
 
-      <QuickNav />
-
       <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
+          <h1 className="text-xl font-bold">My Task Sheet</h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setShowExport(v => !v); setExportFrom(''); setExportTo('') }}
+              className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Export Sheet
+            </button>
+            <button
+              onClick={generateReport}
+              className="text-sm bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Generate EOW Report
+            </button>
+          </div>
+        </div>
         {/* Admin member selector */}
         {isAdmin && (
           <div className="bg-blue-950/40 border border-blue-800/50 rounded-xl p-4 mb-6">

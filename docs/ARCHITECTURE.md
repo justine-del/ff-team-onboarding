@@ -98,16 +98,19 @@ Sequential steps, each gating the next:
 
 **Gating is the single source of truth in [lib/onboarding/gating.ts](../lib/onboarding/gating.ts).**
 A step unlocks only when the prior one is complete; admins bypass.
-- **Phase 0:** new members land on the Guide and click "Mark complete" (→ `POST /api/guide-complete` sets `profiles.guide_completed`). Phase 1 is locked until then.
+- **Phase 0:** new members land on the Guide and click "Mark complete" (→ `POST /api/guide-complete` sets `profiles.guide_completed`). Phase 1 is locked until then. The Guide renders from **`content/getting-started.md`** (the canonical user-facing "how it works" doc) via `app/guide/page.tsx` — edit the markdown to update the page; the sidebar TOC is generated from its headings.
 - The **dashboard** uses `computePhaseGates()` to lock the phase cards (Phase 0 → 1 → 2 → SOPs).
 - Each **`onboarding/*/layout.tsx`** (phase1, phase2, sops) calls `getPhaseContext()`
-  ([lib/onboarding/server.ts](../lib/onboarding/server.ts)) and redirects if the prerequisite
-  isn't met — direct URL access is blocked, not just hidden (phase1 → `/guide`).
+  ([lib/onboarding/server.ts](../lib/onboarding/server.ts)) and, if the prerequisite isn't met,
+  renders a clean **`LockedPhase`** screen (🔒 + link to the prior step) instead of redirecting —
+  so a locked phase *shows as locked* rather than bouncing.
 - Within a phase, items unlock sequentially via `lib/onboarding/taskGating.ts` (Mark-complete per item).
 - Thresholds live in `PHASE_TOTALS` ([lib/constants.ts](../lib/constants.ts)).
 
 **Navigation:** one universal top bar — [components/nav/QuickNav.tsx](../components/nav/QuickNav.tsx) —
-renders on every member page (brand → Getting Started, Home, phases, Task Sheet, Resources → admin links + sign out), so nothing is buried.
+renders on every member page (brand → Getting Started, Home, phases, Task Sheet, Resources → admin links + sign out), so nothing is buried. Locked phases render as a non-clickable 🔒 tab (via `lockedPaths`).
+
+**Auth/perf:** the middleware ([proxy.ts](../proxy.ts)) gates with `getSession()` (cookie read, no network) rather than `getUser()` on every request; server components still call `getUser()` to validate. This removes a per-navigation round-trip to the (Tokyo) auth server.
 
 **Task sheet roles:** besides recurring tasks, a VA can have **Roles** (`va_custom_tasks.is_role`) —
 time-tracked like a task, with optional sub-tasks (`va_custom_tasks.parent_id`) that expand/collapse

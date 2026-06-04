@@ -61,7 +61,8 @@ export default function Phase1Page() {
   useEffect(() => {
     async function load() {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user ?? null
       if (!user) return
       setUserId(user.id)
 
@@ -178,10 +179,6 @@ export default function Phase1Page() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <nav className="border-b border-gray-800 px-6 py-4 flex items-center gap-4">
-        <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">← Dashboard</Link>
-        <h1 className="text-lg font-bold">Phase 1: System Access Setup</h1>
-      </nav>
       <QuickNav />
 
       <main className="max-w-4xl mx-auto px-4 py-8">

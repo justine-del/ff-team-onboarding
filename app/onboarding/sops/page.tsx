@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import Link from 'next/link'
 import QuickNav from '@/components/nav/QuickNav'
 import { computeTaskStates, type TaskState } from '@/lib/onboarding/taskGating'
 
@@ -44,7 +43,8 @@ export default function SOPsPage() {
   useEffect(() => {
     async function load() {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user ?? null
       if (!user) return
 
       setUserId(user.id)
@@ -228,24 +228,20 @@ export default function SOPsPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">← Dashboard</Link>
-          <h1 className="text-lg font-bold">SOPs</h1>
-        </div>
-        {isAdmin && (
-          <button
-            onClick={() => { setShowAddForm(!showAddForm); setError('') }}
-            className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            + Add SOP
-          </button>
-        )}
-      </nav>
-
       <QuickNav />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-xl font-bold">Core SOPs</h1>
+          {isAdmin && (
+            <button
+              onClick={() => { setShowAddForm(!showAddForm); setError('') }}
+              className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              + Add SOP
+            </button>
+          )}
+        </div>
         {error && (
           <div className="mb-4 p-3 bg-red-900/40 border border-red-700 rounded-lg text-red-300 text-sm">{error}</div>
         )}

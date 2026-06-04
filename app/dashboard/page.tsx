@@ -122,6 +122,13 @@ export default async function DashboardPage() {
     profile?.role,
   )
 
+  // Phases to show as 🔒 in the nav (admins have everything unlocked → empty).
+  const lockedPaths = [
+    !phase1Unlocked && '/onboarding/phase1',
+    !phase1Complete && '/onboarding/phase2',
+    !phase2Complete && '/onboarding/sops',
+  ].filter(Boolean) as string[]
+
   const cardClass = CARD_CLASS
 
   const phaseCards = (
@@ -205,7 +212,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <QuickNav isAdmin={hasAdminNav} />
+      <QuickNav isAdmin={hasAdminNav} lockedPaths={lockedPaths} />
 
       <main className="max-w-5xl mx-auto px-4 py-8">
         {isNewUser ? (

@@ -19,8 +19,9 @@ const TABS = [
  * out. Rendered on every member page so nothing is buried. Pass `isAdmin` from
  * server pages that know the role to surface the Admin/Performance links.
  */
-export default function QuickNav({ isAdmin = false }: { isAdmin?: boolean }) {
+export default function QuickNav({ isAdmin = false, lockedPaths = [] }: { isAdmin?: boolean; lockedPaths?: string[] }) {
   const pathname = usePathname()
+  const locked = new Set(lockedPaths)
 
   return (
     <header className="border-b border-gray-800 px-6 flex items-center gap-4 overflow-x-auto">
@@ -30,6 +31,18 @@ export default function QuickNav({ isAdmin = false }: { isAdmin?: boolean }) {
       <nav className="flex gap-1 flex-1">
         {TABS.map(tab => {
           const active = pathname === tab.href || pathname.startsWith(tab.href + '/')
+          const isLocked = locked.has(tab.href)
+          if (isLocked) {
+            return (
+              <span
+                key={tab.href}
+                title="Complete the previous step to unlock"
+                className="text-sm font-medium text-gray-600 px-3 py-3 border-b-2 border-transparent whitespace-nowrap flex-shrink-0 cursor-not-allowed flex items-center gap-1"
+              >
+                <span aria-hidden>🔒</span>{tab.label}
+              </span>
+            )
+          }
           return active ? (
             <span
               key={tab.href}

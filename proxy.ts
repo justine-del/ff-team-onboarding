@@ -25,7 +25,13 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  // Use the cookie-based session for the auth-gate check instead of getUser().
+  // getUser() hits the Supabase auth server (a Tokyo round-trip) on EVERY request;
+  // getSession() reads the JWT from the cookie with no network call. The redirect
+  // here is just a gate — data is still protected by RLS, and server components
+  // call getUser() to validate where it actually matters.
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user ?? null
 
   const { pathname } = request.nextUrl
 
