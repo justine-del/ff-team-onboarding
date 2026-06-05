@@ -192,7 +192,13 @@ export default function AdminPage() {
                   <tr key={member.id} className="border-b border-gray-800/50 hover:bg-gray-900/50">
                     <td className="py-3 pr-4">
                       <div className="flex items-center gap-2">
-                        <p className="font-medium">{member.first_name} {member.last_name}</p>
+                        <Link
+                          href={`/onboarding/phase1?member=${member.id}`}
+                          className="font-medium text-blue-400 hover:text-blue-300 hover:underline"
+                          title="Open this member's Phase 1 checklist"
+                        >
+                          {member.first_name} {member.last_name}
+                        </Link>
                         {member.role === 'offboarding' && (
                           <span className="text-xs bg-orange-900/50 text-orange-400 border border-orange-800/50 px-1.5 py-0.5 rounded">Offboarding</span>
                         )}
@@ -204,9 +210,12 @@ export default function AdminPage() {
                       {member.start_date ? new Date(member.start_date).toLocaleDateString() : '—'}
                     </td>
                     <td className="py-3 pr-4">
-                      <span className={member.phase1Done === 18 ? 'text-green-400' : 'text-gray-300'}>
+                      <Link
+                        href={`/onboarding/phase1?member=${member.id}`}
+                        className={`hover:underline ${member.phase1Done === 18 ? 'text-green-400' : 'text-gray-300 hover:text-white'}`}
+                      >
                         {member.phase1Done}/18
-                      </span>
+                      </Link>
                     </td>
                     <td className="py-3 pr-4">
                       <span className={member.phase2Done === 17 ? 'text-green-400' : 'text-gray-300'}>

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import QuickNav from '@/components/QuickNav'
@@ -46,13 +47,23 @@ const MEMBER_TASKS = [
 type Member = { id: string; first_name: string; last_name: string; email: string }
 
 export default function Phase1Page() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">Loading...</div>}>
+      <Phase1PageInner />
+    </Suspense>
+  )
+}
+
+function Phase1PageInner() {
+  const searchParams = useSearchParams()
+  const memberParam = searchParams.get('member')
   const [completions, setCompletions] = useState<Record<number, string>>({})
   const [memberCompletions, setMemberCompletions] = useState<Record<number, boolean>>({})
   const [userId, setUserId] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(memberParam)
   const [members, setMembers] = useState<Member[]>([])
-  const [activeTab, setActiveTab] = useState<'founder' | 'member'>('founder')
+  const [activeTab, setActiveTab] = useState<'founder' | 'member'>(memberParam ? 'founder' : 'member')
   const [loading, setLoading] = useState(true)
 
   const MEMBER_TASK_IDS = new Set(MEMBER_TASKS.map(t => t.id))
@@ -226,16 +237,16 @@ export default function Phase1Page() {
         {/* Tabs */}
         <div className="flex gap-2 mb-6">
           <button
-            onClick={() => setActiveTab('founder')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'founder' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`}
-          >
-            Founder Setup ({founderDone}/{FOUNDER_TASKS.length})
-          </button>
-          <button
             onClick={() => setActiveTab('member')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'member' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`}
           >
             Your Checklist ({memberDone}/{MEMBER_TASKS.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('founder')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'founder' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`}
+          >
+            Founder Setup ({founderDone}/{FOUNDER_TASKS.length})
           </button>
         </div>
 
