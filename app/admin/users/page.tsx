@@ -268,7 +268,7 @@ export default function UsersPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [showInviteForm, setShowInviteForm] = useState(false)
-  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', job_role: '', start_date: '' })
+  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', job_role: '', start_date: '', role: 'member' })
   const [loading, setLoading] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
   const [message, setMessage] = useState('')
@@ -317,7 +317,7 @@ export default function UsersPage() {
     const res = await fetch('/api/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, company_id: companyId, role: 'member' }),
+      body: JSON.stringify({ ...form, company_id: companyId }),
     })
 
     const result = await res.json()
@@ -325,7 +325,7 @@ export default function UsersPage() {
       setMessage(`Error: ${result.error}`)
     } else {
       setInviteLink(result.invite_link)
-      setForm({ first_name: '', last_name: '', email: '', job_role: '', start_date: '' })
+      setForm({ first_name: '', last_name: '', email: '', job_role: '', start_date: '', role: 'member' })
       setShowInviteForm(false)
       const supabase = createClient()
       const { data } = await supabase
@@ -429,6 +429,15 @@ export default function UsersPage() {
                 <label className="block text-sm text-gray-400 mb-1">Start Date</label>
                 <input type="date" value={form.start_date} onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Account Type</label>
+                <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="member">Member (VA)</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Tip: invite yourself a test Member/Admin to preview that view (open the link in an incognito window).</p>
               </div>
               <div className="sm:col-span-2 flex gap-3">
                 <button type="submit" disabled={loading}

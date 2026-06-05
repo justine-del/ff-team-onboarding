@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import QuickNav from '@/components/QuickNav'
+import QuickNav from '@/components/nav/QuickNav'
+import { brand } from '@/config/brand'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -23,12 +24,11 @@ function formatTime(mins: number): string {
   return m > 0 ? `${h}h${m}m` : `${h}h`
 }
 
+// One calm style: empty vs filled. (Dropped the 4-color yellow/blue/green/purple
+// tiers — they were visual noise; the number + time label convey the amount.)
 function timeBadgeClass(mins: number): string {
-  if (!mins) return 'bg-gray-800/50 border-gray-700 text-gray-600'
-  if (mins <= 30) return 'bg-yellow-900/40 border-yellow-700/50 text-yellow-300'
-  if (mins <= 90) return 'bg-blue-900/40 border-blue-700/50 text-blue-300'
-  if (mins <= 240) return 'bg-green-900/40 border-green-700/50 text-green-300'
-  return 'bg-purple-900/40 border-purple-700/50 text-purple-300'
+  if (!mins) return 'bg-gray-800/40 border-gray-700/60 text-gray-600'
+  return 'bg-green-900/25 border-green-800/50 text-green-200'
 }
 
 function buildSemanticHtml(reportText: string): string {
@@ -126,7 +126,7 @@ function buildReportHtml(reportText: string, memberName: string, weekOf: string)
     p{margin:5px 0;font-size:13px}
     footer{margin-top:40px;border-top:1px solid #ddd;padding-top:8px;font-size:11px;color:#aaa}
   </style></head><body>${body}
-  <footer>Generated via Cyborg VA Portal · ${memberName} · ${weekOf}</footer>
+  <footer>Generated via ${brand.productName} · ${memberName} · ${weekOf}</footer>
   </body></html>`
 }
 
@@ -139,6 +139,8 @@ type CustomTask = {
   est_time: string
   loom_link: string
   sop_doc_link: string
+  is_role?: boolean
+  parent_id?: number | null
 }
 
 type VALink = {
@@ -225,7 +227,7 @@ function TimerCell({ mins, disabled, onSave, completionKey }: {
         onBlur={() => commit(inputVal)}
         onKeyDown={e => { if (e.key === 'Enter') { commit(inputVal); (e.target as HTMLInputElement).blur() } }}
         disabled={disabled}
-        className={`w-12 text-center text-xs rounded px-1 py-0.5 border focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${timeBadgeClass(mins)} ${disabled ? 'opacity-70 cursor-default' : ''}`}
+        className={`w-14 text-center text-sm rounded-md px-1 py-1 border focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${timeBadgeClass(mins)} ${disabled ? 'opacity-70 cursor-default' : ''}`}
       />
       {mins > 0 && <span className="text-[9px] text-gray-500 leading-none">{formatTime(mins)}</span>}
       {!disabled && (
@@ -312,6 +314,9 @@ export default function TasksPage() {
   const [expandedLinks, setExpandedLinks] = useState<number | null>(null)
   const [customTasks, setCustomTasks] = useState<CustomTask[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
+  // What the add form is creating: a plain task, a role, or a sub-task under a role.
+  const [addContext, setAddContext] = useState<{ is_role?: boolean; parent_id?: number | null }>({})
+  const [expandedRoles, setExpandedRoles] = useState<Set<number>>(new Set())
   const [newTask, setNewTask] = useState({ task_name: '', description: '', days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '', est_time: '' })
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null)
   const [editDraft, setEditDraft] = useState({ task_name: '', description: '', days: [] as string[], time_window: '', est_time: '' })
@@ -383,7 +388,8 @@ export default function TasksPage() {
   useEffect(() => {
     async function load() {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user ?? null
       if (!user) return
       setUserId(user.id)
 
@@ -543,7 +549,11 @@ export default function TasksPage() {
       })))
     }
     loadRecentDays()
-  }, [viewingId, selectedMemberId, completions])
+    // NB: intentionally NOT keyed on `completions` — loadRecentDays issues its
+    // own query and never reads completion state. Depending on it serialized
+    // this load behind the main fetch (a waterfall) and re-ran it on every time
+    // entry. Keyed only on the member/week so it runs in parallel with loadData.
+  }, [viewingId, selectedMemberId])
 
   async function setTaskTime(taskId: number, day: string, minutes: number) {
     if (!userId || !!selectedMemberId || !isEditableWeek) return
@@ -640,7 +650,7 @@ export default function TasksPage() {
   async function addCustomTask() {
     if (!userId || !newTask.task_name.trim()) return
     const supabase = createClient()
-    const { data } = await supabase.from('va_custom_tasks').insert({
+    const insertRow: Record<string, unknown> = {
       user_id: userId,
       task_name: newTask.task_name,
       description: newTask.description,
@@ -650,10 +660,51 @@ export default function TasksPage() {
       loom_link: '',
       sop_doc_link: '',
       created_week_start: weekStart,
-    }).select().single()
+    }
+    // Only set the role columns when creating a role/sub-task, so plain-task
+    // creation keeps working even before the is_role/parent_id migration is run.
+    if (addContext.is_role) insertRow.is_role = true
+    if (addContext.parent_id) insertRow.parent_id = addContext.parent_id
+    const { data } = await supabase.from('va_custom_tasks').insert(insertRow).select().single()
     if (data) setCustomTasks(prev => [...prev, data])
+    // Keep a newly-created role expanded so its sub-tasks are visible.
+    if (data?.is_role) setExpandedRoles(prev => new Set(prev).add(data.id))
     setNewTask({ task_name: '', description: '', days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '', est_time: '' })
     setShowAddForm(false)
+    setAddContext({})
+  }
+
+  // Open the add form pre-set to create a plain task, a role, or a sub-task.
+  function openAdd(context: { is_role?: boolean; parent_id?: number | null }) {
+    setAddContext(context)
+    setShowAddForm(true)
+  }
+
+  function toggleRole(roleId: number) {
+    setExpandedRoles(prev => {
+      const next = new Set(prev)
+      if (next.has(roleId)) next.delete(roleId); else next.add(roleId)
+      return next
+    })
+  }
+
+  // Ordered rows for the custom-tasks table: each role, followed by its sub-tasks
+  // when expanded, then plain custom tasks. Roles and sub-tasks are both ordinary
+  // va_custom_tasks rows, so they reuse the same time-tracking row below.
+  function buildCustomRows(): { task: CustomTask; indent: boolean; isRole: boolean }[] {
+    const roles = customTasks.filter(t => t.is_role && !t.parent_id)
+    const plain = customTasks.filter(t => !t.is_role && !t.parent_id)
+    const rows: { task: CustomTask; indent: boolean; isRole: boolean }[] = []
+    for (const role of roles) {
+      rows.push({ task: role, indent: false, isRole: true })
+      if (expandedRoles.has(role.id)) {
+        for (const st of customTasks.filter(t => t.parent_id === role.id)) {
+          rows.push({ task: st, indent: true, isRole: false })
+        }
+      }
+    }
+    for (const t of plain) rows.push({ task: t, indent: false, isRole: false })
+    return rows
   }
 
   async function updateCustomTask(id: number, fields: Partial<Pick<CustomTask, 'task_name' | 'description' | 'days' | 'time_window' | 'est_time'>>) {
@@ -867,7 +918,7 @@ export default function TasksPage() {
     // ExcelJS is heavy (~250KB) so it's loaded only when the export runs.
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
-    wb.creator = 'Cyborg VA Portal'
+    wb.creator = brand.productName
     wb.created = new Date()
     const sheet = wb.addWorksheet('Tasksheet', {
       views: [{ state: 'frozen', ySplit: 3 }], // keep the column header visible while scrolling
@@ -1143,26 +1194,7 @@ export default function TasksPage() {
   return (
     <>
     <div className="min-h-screen bg-gray-950 text-white">
-      <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">← Dashboard</Link>
-          <h1 className="text-lg font-bold">My Task Sheet</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setShowExport(v => !v); setExportFrom(''); setExportTo('') }}
-            className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            Export Sheet
-          </button>
-          <button
-            onClick={generateReport}
-            className="text-sm bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            Generate EOW Report
-          </button>
-        </div>
-      </nav>
+      <QuickNav />
 
       {showExport && (() => {
         const [pY, pM] = presetMonth.split('-').map(Number)
@@ -1238,9 +1270,24 @@ export default function TasksPage() {
         )
       })()}
 
-      <QuickNav />
-
       <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-8 gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold">My Task Sheet</h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setShowExport(v => !v); setExportFrom(''); setExportTo('') }}
+              className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Export Sheet
+            </button>
+            <button
+              onClick={generateReport}
+              className="text-sm bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Generate EOW Report
+            </button>
+          </div>
+        </div>
         {/* Admin member selector */}
         {isAdmin && (
           <div className="bg-blue-950/40 border border-blue-800/50 rounded-xl p-4 mb-6">
@@ -1282,12 +1329,7 @@ export default function TasksPage() {
               <span className="text-xs text-gray-400">Hours this week</span>
               <span className={`text-sm font-bold ${weeklyMinutes > 0 ? 'text-green-400' : 'text-gray-600'}`}>{weeklyHours}h</span>
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-600 flex-wrap">
-              <span className="w-2 h-2 rounded-full bg-yellow-500/60 inline-block"></span><span>≤30m</span>
-              <span className="w-2 h-2 rounded-full bg-blue-500/60 inline-block"></span><span>≤90m</span>
-              <span className="w-2 h-2 rounded-full bg-green-500/60 inline-block"></span><span>≤4h</span>
-              <span className="w-2 h-2 rounded-full bg-purple-500/60 inline-block"></span><span>4h+</span>
-            </div>
+            <p className="text-xs text-gray-600">Minutes logged per task per day. Use <span className="text-gray-400">▶ track</span> to time it live.</p>
           </div>
 
           {/* Daily Avg (last 5 working days) */}
@@ -1323,8 +1365,31 @@ export default function TasksPage() {
             })()}
           </div>
 
-          {/* Watch & Learn */}
-          <div className="bg-gray-900 border border-green-800/30 rounded-xl p-4">
+          {/* Guidelines (Must Read — surfaced above the optional Watch & Learn) */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="text-sm font-semibold text-gray-200">Guidelines</h3>
+              <span className="text-xs font-medium bg-red-900/50 text-red-300 border border-red-700/40 px-1.5 py-0.5 rounded-full ml-auto">Must Read</span>
+            </div>
+            <ol className="space-y-2 mb-3">
+              {[
+                'Tasks are your full responsibility unless stated otherwise.',
+                'Complete tasks within the time windows.',
+                "If you can't complete a task, message the Founder or Manager immediately.",
+                'Anything less than the stated process is grounds for performance review.',
+              ].map((rule, i) => (
+                <li key={i} className="text-xs text-gray-400 flex gap-2">
+                  <span className="font-bold text-gray-300 flex-shrink-0">{i + 1}.</span><span>{rule}</span>
+                </li>
+              ))}
+            </ol>
+            <p className="text-xs text-yellow-200/70 border-t border-gray-800 pt-3">
+              <span className="font-semibold text-yellow-300">Completion:</span> Only done after sending the Communication Text (if required).
+            </p>
+          </div>
+
+          {/* Watch & Learn (optional one-time) */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0"></span>
               <h3 className="text-sm font-semibold text-green-300">Watch & Learn</h3>
@@ -1353,29 +1418,6 @@ export default function TasksPage() {
                 )
               })}
             </div>
-          </div>
-
-          {/* Guidelines */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <h3 className="text-sm font-semibold text-gray-200">Guidelines</h3>
-              <span className="text-xs font-medium bg-red-900/50 text-red-300 border border-red-700/40 px-1.5 py-0.5 rounded-full ml-auto">Must Read</span>
-            </div>
-            <ol className="space-y-2 mb-3">
-              {[
-                'Tasks are your full responsibility unless stated otherwise.',
-                'Complete tasks within the time windows.',
-                "If you can't complete a task, message the Founder or Manager immediately.",
-                'Anything less than the stated process is grounds for performance review.',
-              ].map((rule, i) => (
-                <li key={i} className="text-xs text-gray-400 flex gap-2">
-                  <span className="font-bold text-gray-300 flex-shrink-0">{i + 1}.</span><span>{rule}</span>
-                </li>
-              ))}
-            </ol>
-            <p className="text-xs text-yellow-200/70 border-t border-gray-800 pt-3">
-              <span className="font-semibold text-yellow-300">Completion:</span> Only done after sending the Communication Text (if required).
-            </p>
           </div>
         </div>
 
@@ -1438,15 +1480,21 @@ export default function TasksPage() {
           <button onClick={() => toggleSection('custom')} className="w-full flex items-center justify-between px-4 py-2.5 bg-teal-950/40 border border-teal-800/50 rounded-xl mb-3 hover:bg-teal-950/60 transition-colors">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-teal-400 flex-shrink-0"></span>
-              <span className="font-semibold text-teal-300 text-sm">My Custom Tasks</span>
-              <span className="text-xs text-teal-400/60">{customTasks.length} tasks</span>
+              <span className="font-semibold text-teal-300 text-sm">My Custom Tasks &amp; Roles</span>
+              <span className="text-xs text-teal-400/60">{customTasks.length} items</span>
             </div>
             <div className="flex items-center gap-2">
               {!selectedMemberId && (
-                <button onClick={e => { e.stopPropagation(); setShowAddForm(!showAddForm) }}
-                  className="text-xs bg-teal-800/60 hover:bg-teal-700/60 text-teal-300 px-2.5 py-1 rounded-lg transition-colors">
-                  + Add
-                </button>
+                <>
+                  <button onClick={e => { e.stopPropagation(); openAdd({}) }}
+                    className="text-xs bg-teal-800/60 hover:bg-teal-700/60 text-teal-300 px-2.5 py-1 rounded-lg transition-colors">
+                    + Task
+                  </button>
+                  <button onClick={e => { e.stopPropagation(); openAdd({ is_role: true }) }}
+                    className="text-xs bg-teal-800/60 hover:bg-teal-700/60 text-teal-300 px-2.5 py-1 rounded-lg transition-colors">
+                    + Role
+                  </button>
+                </>
               )}
               <span className="text-teal-400 text-xs">{collapsed.custom ? '▼ Show' : '▲ Hide'}</span>
             </div>
@@ -1457,7 +1505,7 @@ export default function TasksPage() {
 
           {showAddForm && (
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-4">
-              <h4 className="text-sm font-medium mb-3">New Custom Task</h4>
+              <h4 className="text-sm font-medium mb-3">{addContext.is_role ? 'New Role' : addContext.parent_id ? 'New Sub-task' : 'New Custom Task'}</h4>
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">Task Name *</label>
@@ -1493,8 +1541,8 @@ export default function TasksPage() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={addCustomTask} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">Add Task</button>
-                  <button onClick={() => setShowAddForm(false)} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition-colors">Cancel</button>
+                  <button onClick={addCustomTask} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">{addContext.is_role ? 'Add Role' : addContext.parent_id ? 'Add Sub-task' : 'Add Task'}</button>
+                  <button onClick={() => { setShowAddForm(false); setAddContext({}) }} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition-colors">Cancel</button>
                 </div>
               </div>
             </div>
@@ -1518,7 +1566,7 @@ export default function TasksPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {customTasks.map(task => {
+                  {buildCustomRows().map(({ task, indent, isRole }) => {
                     const isEditing = editingTaskId === task.id
                     if (isEditing) {
                       return (
@@ -1575,12 +1623,23 @@ export default function TasksPage() {
                       )
                     }
                     return (
-                    <tr key={task.id} className="border-b border-gray-800/50">
-                      <td className="py-3 pr-4 align-top">
-                        <p className="font-medium">{task.task_name}</p>
-                        {task.description && <p className="text-xs text-gray-400">{task.description}</p>}
+                    <tr key={task.id} className={`border-b border-gray-800/50 ${isRole ? 'bg-teal-950/20' : ''}`}>
+                      <td className="py-3 pr-4 align-top" style={indent ? { paddingLeft: '1.75rem' } : undefined}>
+                        <div className="flex items-center gap-1.5">
+                          {isRole && (
+                            <button onClick={() => toggleRole(task.id)} title="Show/hide sub-tasks" className="text-gray-500 hover:text-white text-xs w-4 flex-shrink-0">
+                              {expandedRoles.has(task.id) ? '▾' : '▸'}
+                            </button>
+                          )}
+                          <p className="font-medium">{indent ? <span className="text-gray-600">└ </span> : ''}{task.task_name}</p>
+                          {isRole && <span className="text-[10px] uppercase tracking-wide text-teal-400/70 border border-teal-800/60 rounded px-1.5 py-0.5">Role</span>}
+                        </div>
+                        {task.description && <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>}
                         <LinkSection taskId={task.id + 10000} />
                         <NoteSection taskKey={`custom-${task.id}`} taskId={task.id + 10000} expandedNote={expandedNote} setExpandedNote={setExpandedNote} taskNotes={taskNotes} setTaskNotes={setTaskNotes} saveTaskNote={saveTaskNote} disabled={!!selectedMemberId} />
+                        {isRole && expandedRoles.has(task.id) && !selectedMemberId && (
+                          <button onClick={() => openAdd({ parent_id: task.id })} className="text-xs text-teal-400 hover:text-teal-300 mt-1.5 transition-colors">+ sub-task</button>
+                        )}
                       </td>
                       <td className="py-3 pr-4 text-gray-400 hidden md:table-cell align-top text-xs">{task.est_time}</td>
                       {DAYS.map(d => {

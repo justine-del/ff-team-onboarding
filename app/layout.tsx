@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
-import ThemeProvider from '@/components/ThemeProvider'
-import FloatingChat from '@/components/FloatingChat'
+import ThemeProvider from '@/components/providers/ThemeProvider'
+import FloatingChat from '@/components/chat/FloatingChat'
+import { fullTitle } from '@/config/brand'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -15,7 +16,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Cyborg VA Portal — Funnel Futurist',
+  title: fullTitle,
   description: 'Team onboarding and task management portal',
 }
 

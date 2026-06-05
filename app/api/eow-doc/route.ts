@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleAuth } from 'google-auth-library'
+import { brand } from '@/config/brand'
 
 function reportToHtml(reportText: string, memberName: string, weekOf: string): string {
   const lines = reportText.split('\n')
@@ -85,7 +86,7 @@ function reportToHtml(reportText: string, memberName: string, weekOf: string): s
   closeList(); closeTable()
   html += `
     <br><hr style="border:none; border-top:1px solid #ddd; margin-top:32px;">
-    <p style="font-size:11px; color:#aaa;">Generated via Cyborg VA Portal · ${memberName} · ${weekOf}</p>
+    <p style="font-size:11px; color:#aaa;">Generated via ${brand.productName} · ${memberName} · ${weekOf}</p>
     </body></html>
   `
   return html

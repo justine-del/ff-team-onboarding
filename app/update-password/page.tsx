@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { brand } from '@/config/brand'
 
 export default function UpdatePasswordPage() {
   const [password, setPassword] = useState('')
@@ -60,7 +61,7 @@ export default function UpdatePasswordPage() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-gray-900 rounded-2xl p-8 shadow-xl border border-gray-800">
         <h2 className="text-xl font-semibold text-white mb-2">Set your password</h2>
-        <p className="text-gray-400 text-sm mb-6">Choose a strong password for your Cyborg VA account.</p>
+        <p className="text-gray-400 text-sm mb-6">Choose a strong password for your {brand.shortName} account.</p>
 
         {error && <div className="mb-4 p-3 bg-red-900/40 border border-red-700 rounded-lg text-red-300 text-sm">{error}</div>}
 

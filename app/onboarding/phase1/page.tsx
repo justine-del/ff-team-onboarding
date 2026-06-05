@@ -4,7 +4,8 @@ import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import QuickNav from '@/components/QuickNav'
+import QuickNav from '@/components/nav/QuickNav'
+import { computeTaskStates } from '@/lib/onboarding/taskGating'
 
 const SECURITY_NOTICES = [
   'Use LastPass or 1Password for all passwords',
@@ -71,7 +72,8 @@ function Phase1PageInner() {
   useEffect(() => {
     async function load() {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user ?? null
       if (!user) return
       setUserId(user.id)
 
@@ -179,16 +181,15 @@ function Phase1PageInner() {
   const founderDone = FOUNDER_TASKS.filter(t => completions[t.id] === 'done').length
   const memberDone = MEMBER_TASKS.filter(t => memberCompletions[t.id]).length
 
+  // Sequential gating for the member checklist: each step unlocks the next.
+  const memberTaskStates = computeTaskStates(MEMBER_TASKS.map(t => t.id), id => memberCompletions[id] ?? false)
+
   if (loading) {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">Loading...</div>
   }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <nav className="border-b border-gray-800 px-6 py-4 flex items-center gap-4">
-        <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">← Dashboard</Link>
-        <h1 className="text-lg font-bold">Phase 1: System Access Setup</h1>
-      </nav>
       <QuickNav />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
@@ -306,30 +307,57 @@ function Phase1PageInner() {
           <div className="space-y-2">
             <p className="text-sm text-gray-400 mb-4">Complete these after the Founder has finished Phase 1 setup.</p>
             {MEMBER_TASKS.map(task => {
-              const isDone = memberCompletions[task.id] ?? false
+              const state = memberTaskStates[String(task.id)] ?? 'locked'
+              const done = state === 'done'
+              // Admins view the member checklist read-only — don't lock it for them.
+              const locked = state === 'locked' && !isAdmin
               return (
-                <div key={task.id} className={`flex items-start gap-3 p-4 rounded-xl border transition-colors ${isDone ? 'bg-green-900/20 border-green-800/50' : 'bg-gray-900 border-gray-800'}`}>
-                  <button
-                    onClick={() => toggleMemberTask(task.id)}
-                    disabled={isAdmin}
-                    className={`mt-0.5 w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center transition-colors ${isDone ? 'bg-green-500 border-green-500' : 'border-gray-600'} ${isAdmin ? 'cursor-not-allowed opacity-40' : 'cursor-pointer hover:border-green-400'}`}
-                  >
-                    {isDone && <span className="text-white text-xs">✓</span>}
-                  </button>
-                  <div>
-                    <p className="font-medium text-sm">{task.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>
-                    {task.doc_link && (
-                      <a
-                        href={task.doc_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-purple-400 hover:text-purple-300 mt-1.5 inline-block"
-                      >
-                        View SOP →
-                      </a>
-                    )}
+                <div key={task.id} className={`p-4 rounded-xl border transition-colors ${done ? 'bg-green-900/20 border-green-800/50' : locked ? 'bg-gray-900/40 border-gray-800/50 opacity-60' : 'bg-gray-900 border-gray-700'}`}>
+                  <div className="flex items-start gap-3">
+                    <span className={`mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] ${done ? 'bg-green-500 text-white' : locked ? 'bg-gray-800 text-gray-500' : 'border-2 border-gray-600'}`}>
+                      {done ? '✓' : locked ? '🔒' : ''}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-medium text-sm ${locked ? 'text-gray-500' : ''}`}>{task.name}</p>
+                      {locked ? (
+                        <p className="text-xs text-gray-600 mt-0.5">Complete the previous step to unlock</p>
+                      ) : (
+                        <>
+                          <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>
+                          {task.doc_link && (
+                            <a
+                              href={task.doc_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-purple-400 hover:text-purple-300 mt-1.5 inline-block"
+                            >
+                              📄 Open document →
+                            </a>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
+                  {!locked && (
+                    <div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between gap-3">
+                      {done ? (
+                        <>
+                          <span className="text-xs text-green-500">✓ Completed</span>
+                          {!isAdmin && (
+                            <button onClick={() => toggleMemberTask(task.id)} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">Reopen</button>
+                          )}
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => toggleMemberTask(task.id)}
+                          disabled={isAdmin}
+                          className="ml-auto text-sm font-medium bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-1.5 rounded-lg transition-colors"
+                        >
+                          Mark as complete
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}

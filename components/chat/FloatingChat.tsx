@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
 
 type Message = { role: 'user' | 'assistant'; content: string }
 
@@ -79,7 +78,6 @@ export default function FloatingChat() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/chat" title="Open full screen" className="text-gray-500 hover:text-gray-300 text-xs transition-colors">⤢</Link>
             <button onClick={() => setOpen(false)} className="text-gray-500 hover:text-white transition-colors text-lg leading-none">×</button>
           </div>
         </div>

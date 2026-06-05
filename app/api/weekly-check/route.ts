@@ -155,23 +155,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ── 8. Wellness — flagged check-ins from the past week ───────────────────
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-  const { data: flagged, error: wellnessErr } = await supabase
-    .from('wellness_checkins')
-    .select('id, user_id, mood, created_at')
-    .eq('flagged', true)
-    .gte('created_at', sevenDaysAgo)
-
-  if (wellnessErr) {
-    details.flagged_wellness_checkins = `FAIL — ${wellnessErr.message}`
-  } else {
-    details.flagged_wellness_checkins_past_7_days = flagged?.length ?? 0
-    if ((flagged?.length ?? 0) > 0) {
-      issues.push(`${flagged!.length} flagged wellness check-in(s) in the past 7 days — review in admin dashboard`)
-    }
-  }
-
   // ── Summary ──────────────────────────────────────────────────────────────
   const status = issues.length === 0 ? 'healthy' : 'issues_found'
 

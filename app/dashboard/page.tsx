@@ -2,8 +2,13 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import MemberStats from '@/components/MemberStats'
-import VAOffboardingForm from '@/components/VAOffboardingForm'
+import MemberStats from '@/components/stats/MemberStatsLazy'
+import VAOffboardingForm from '@/components/offboarding/VAOffboardingForm'
+import { PHASE_TOTALS, WEEKS_OF_HISTORY, TIMEZONE_OFFSET_MS } from '@/lib/constants'
+import { computePhaseGates } from '@/lib/onboarding/gating'
+import { CARD_CLASS } from '@/lib/ui'
+import ProgressBar from '@/components/ui/ProgressBar'
+import QuickNav from '@/components/nav/QuickNav'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -19,7 +24,7 @@ export default async function DashboardPage() {
   )
   const { data: profile } = await admin
     .from('profiles')
-    .select('*')
+    .select('role, first_name, guide_completed')
     .eq('id', user.id)
     .single()
 
@@ -27,7 +32,7 @@ export default async function DashboardPage() {
   // Must match the client-side getMonday() in tasks page: PHT (UTC+8) users store week_start
   // as the ISO date of Monday midnight PHT expressed in UTC, which is the previous day (Sunday).
   function getWeekStarts(n: number) {
-    const PHT = 8 * 60 * 60 * 1000
+    const PHT = TIMEZONE_OFFSET_MS
     const phtNow = new Date(Date.now() + PHT)
     const day = phtNow.getUTCDay()
     const diff = day === 0 ? -6 : 1 - day
@@ -41,7 +46,7 @@ export default async function DashboardPage() {
       return d.toISOString().split('T')[0]
     })
   }
-  const weekStarts8 = getWeekStarts(8)
+  const weekStarts8 = getWeekStarts(WEEKS_OF_HISTORY)
   const currentWeek = weekStarts8[0]
 
   // VA is in the offboarding process — show their fillable form
@@ -72,22 +77,17 @@ export default async function DashboardPage() {
   let teamStats: { active: number; inconsistent: number; needsAttention: number; noActivity: number } | null = null
   if (isAdminUser && allMembers.data && allMembers.data.length > 0) {
     const memberIds = allMembers.data.map((m: { id: string }) => m.id)
-    const { data: thisWeekRows } = await admin
+    // One query for both weeks (was two sequential round-trips), split in memory.
+    const lastWeekStart = weekStarts8[1]
+    const { data: weekRows } = await admin
       .from('task_completions')
-      .select('user_id, time_spent')
+      .select('user_id, week_start, time_spent')
       .in('user_id', memberIds)
-      .eq('week_start', currentWeek)
+      .in('week_start', [currentWeek, lastWeekStart])
       .gt('time_spent', 0)
 
-    const { data: lastWeekRows } = await admin
-      .from('task_completions')
-      .select('user_id, time_spent')
-      .in('user_id', memberIds)
-      .eq('week_start', weekStarts8[1])
-      .gt('time_spent', 0)
-
-    const thisWeekActive = new Set(thisWeekRows?.map(r => r.user_id) ?? [])
-    const lastWeekActive = new Set(lastWeekRows?.map(r => r.user_id) ?? [])
+    const thisWeekActive = new Set((weekRows ?? []).filter(r => r.week_start === currentWeek).map(r => r.user_id))
+    const lastWeekActive = new Set((weekRows ?? []).filter(r => r.week_start === lastWeekStart).map(r => r.user_id))
 
     let active = 0, inconsistent = 0, needsAttention = 0, noActivity = 0
     for (const id of memberIds) {
@@ -101,11 +101,11 @@ export default async function DashboardPage() {
   }
 
   const phase1Done = phase1.data?.filter(t => t.status === 'done').length ?? 0
-  const phase1Total = 24
+  const phase1Total = PHASE_TOTALS.phase1
   const phase2Done = phase2.data?.length ?? 0
-  const phase2Total = 17
+  const phase2Total = PHASE_TOTALS.phase2
   const sopsD = sops.data?.length ?? 0
-  const sopsTotal = 10
+  const sopsTotal = PHASE_TOTALS.sops
 
   const totalDone = phase1Done + phase2Done + sopsD
   const totalItems = phase1Total + phase2Total + sopsTotal
@@ -115,26 +115,52 @@ export default async function DashboardPage() {
 
   const isNewUser = phase1Done === 0 && phase2Done === 0 && sopsD === 0
 
-  // Maki and Josua must complete phases in order; everyone else gets all unlocked
-  const LOCKED_MEMBERS = ['maki@joburn.com', 'josua@joburn.com']
-  const isLocked = LOCKED_MEMBERS.includes(profile?.email ?? '')
-  const phase1Complete = isLocked ? phase1Done >= phase1Total : true
-  const phase2Complete = isLocked ? phase2Done >= phase2Total : true
+  // Sequential gating for everyone: Phase 0 (Guide) → Phase 1 → Phase 2 → SOPs.
+  // Each unlocks only when the prior step is done. Admins/super_admins bypass.
+  const { guideComplete, phase1Unlocked, phase1Complete, phase2Complete } = computePhaseGates(
+    { guideDone: profile?.guide_completed ?? false, phase1Done, phase2Done, sopsDone: sopsD },
+    profile?.role,
+  )
 
-  const cardClass = "bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-gray-600 transition-colors"
+  // Phases to show as 🔒 in the nav (admins have everything unlocked → empty).
+  const lockedPaths = [
+    !phase1Unlocked && '/onboarding/phase1',
+    !phase1Complete && '/onboarding/phase2',
+    !phase2Complete && '/onboarding/sops',
+  ].filter(Boolean) as string[]
+
+  const cardClass = CARD_CLASS
 
   const phaseCards = (
     <>
-      <Link href="/onboarding/phase1" className={cardClass}>
+      <Link href="/guide" className={cardClass}>
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-xl">🔧</span>
-          <h3 className="font-semibold text-sm">Phase 1: System Access</h3>
+          <span className="text-xl">📖</span>
+          <h3 className="font-semibold text-sm">Phase 0: Getting Started</h3>
         </div>
-        <div className="text-xs text-gray-400 mb-1.5">{phase1Done} / {phase1Total} complete</div>
-        <div className="w-full bg-gray-800 rounded-full h-1.5">
-          <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${Math.round((phase1Done / phase1Total) * 100)}%` }} />
+        <div className="text-xs text-gray-400">
+          {guideComplete ? '✓ Guide complete' : 'Read the guide, then mark it complete'}
         </div>
       </Link>
+
+      {phase1Unlocked ? (
+        <Link href="/onboarding/phase1" className={cardClass}>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">🔧</span>
+            <h3 className="font-semibold text-sm">Phase 1: System Access</h3>
+          </div>
+          <div className="text-xs text-gray-400 mb-1.5">{phase1Done} / {phase1Total} complete</div>
+          <ProgressBar value={phase1Done} total={phase1Total} />
+        </Link>
+      ) : (
+        <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 opacity-60 cursor-not-allowed">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xl">🔒</span>
+            <h3 className="font-semibold text-sm text-gray-500">Phase 1: System Access</h3>
+          </div>
+          <p className="text-xs text-gray-600">Complete Getting Started to unlock</p>
+        </div>
+      )}
 
       {phase1Complete ? (
         <Link href="/onboarding/phase2" className={cardClass}>
@@ -143,9 +169,7 @@ export default async function DashboardPage() {
             <h3 className="font-semibold text-sm">Phase 2: Foundations</h3>
           </div>
           <div className="text-xs text-gray-400 mb-1.5">{phase2Done} / {phase2Total} complete</div>
-          <div className="w-full bg-gray-800 rounded-full h-1.5">
-            <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${Math.round((phase2Done / phase2Total) * 100)}%` }} />
-          </div>
+          <ProgressBar value={phase2Done} total={phase2Total} />
         </Link>
       ) : (
         <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 opacity-60 cursor-not-allowed">
@@ -161,18 +185,16 @@ export default async function DashboardPage() {
         <Link href="/onboarding/sops" className={cardClass}>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xl">📋</span>
-            <h3 className="font-semibold text-sm">Phase 2.1: FF Core SOPs</h3>
+            <h3 className="font-semibold text-sm">Phase 2.1: Core SOPs</h3>
           </div>
           <div className="text-xs text-gray-400 mb-1.5">{sopsD} / {sopsTotal} complete</div>
-          <div className="w-full bg-gray-800 rounded-full h-1.5">
-            <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${Math.round((sopsD / sopsTotal) * 100)}%` }} />
-          </div>
+          <ProgressBar value={sopsD} total={sopsTotal} />
         </Link>
       ) : (
         <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 opacity-60 cursor-not-allowed">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xl">🔒</span>
-            <h3 className="font-semibold text-sm text-gray-500">Phase 2.1: FF Core SOPs</h3>
+            <h3 className="font-semibold text-sm text-gray-500">Phase 2.1: Core SOPs</h3>
           </div>
           <p className="text-xs text-gray-600">Complete Phase 2 to unlock</p>
         </div>
@@ -185,43 +207,12 @@ export default async function DashboardPage() {
         </div>
         <div className="text-xs text-gray-400">{tasks.data?.length ?? 0} tasks checked off this week</div>
       </Link>
-
-      <Link href="/chat" className={cardClass}>
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xl">🤖</span>
-          <h3 className="font-semibold text-sm">VA Assistant</h3>
-        </div>
-        <div className="text-xs text-gray-400">Ask anything about SOPs & policies</div>
-      </Link>
-
-      <Link href="/wellness" className={cardClass}>
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xl">💙</span>
-          <h3 className="font-semibold text-sm">Wellness Check</h3>
-        </div>
-        <div className="text-xs text-gray-400">How are you feeling today?</div>
-      </Link>
     </>
   )
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-lg font-bold">Cyborg VA Portal</h1>
-        <div className="flex items-center gap-4">
-          {hasAdminNav && (
-            <Link href="/admin" className="text-sm text-blue-400 hover:text-blue-300">Admin</Link>
-          )}
-          {isAdminUser && (
-            <Link href="/admin/performance" className="text-sm text-purple-400 hover:text-purple-300">Performance</Link>
-          )}
-          <Link href="/resources" className="text-sm text-gray-400 hover:text-white">Resources</Link>
-          <Link href="/guide" className="text-sm text-gray-400 hover:text-white">Guide</Link>
-          <form action="/auth/signout" method="post">
-            <button className="text-sm text-gray-400 hover:text-white">Sign out</button>
-          </form>
-        </div>
-      </nav>
+      <QuickNav isAdmin={hasAdminNav} lockedPaths={lockedPaths} />
 
       <main className="max-w-5xl mx-auto px-4 py-8">
         {isNewUser ? (
