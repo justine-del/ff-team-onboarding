@@ -69,6 +69,9 @@ function Phase1PageInner() {
 
   const MEMBER_TASK_IDS = new Set(MEMBER_TASKS.map(t => t.id))
 
+  // First mount: resolve the logged-in user, their role, and the member list.
+  // We don't load completions here — that's the second effect, which keys off
+  // the user being viewed (admin's selected member, or the logged-in user).
   useEffect(() => {
     async function load() {
       const supabase = createClient()
@@ -78,26 +81,38 @@ function Phase1PageInner() {
       setUserId(user.id)
 
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      const admin = profile?.role === 'admin'
+      const admin = profile?.role === 'admin' || profile?.role === 'super_admin'
       setIsAdmin(admin)
 
       if (admin) {
         const { data: allMembers } = await supabase
           .from('profiles')
           .select('id, first_name, last_name, email')
-          .eq('role', 'member')
+          .in('role', ['member', 'offboarding'])
           .order('first_name')
         setMembers(allMembers ?? [])
       }
+    }
+    load()
+  }, [])
 
-      const { data: phase1Data } = await supabase
+  // Load both founder + member completions for the user being VIEWED. Single
+  // source of truth: if an admin has picked a member, that member's data;
+  // otherwise the logged-in user's. Prevents the old race where the admin's
+  // own data leaked into the member view.
+  useEffect(() => {
+    if (!userId) return
+    const viewedUserId = isAdmin && selectedMemberId ? selectedMemberId : userId
+    async function loadCompletions() {
+      const supabase = createClient()
+      const { data } = await supabase
         .from('phase1_completion')
         .select('task_id, status')
-        .eq('user_id', user.id)
+        .eq('user_id', viewedUserId)
 
       const founderMap: Record<number, string> = {}
       const memberMap: Record<number, boolean> = {}
-      phase1Data?.forEach(row => {
+      data?.forEach(row => {
         if (MEMBER_TASK_IDS.has(row.task_id)) {
           memberMap[row.task_id] = row.status === 'done'
         } else {
@@ -108,27 +123,9 @@ function Phase1PageInner() {
       setMemberCompletions(memberMap)
       setLoading(false)
     }
-    load()
+    loadCompletions()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    if (!selectedMemberId) return
-    async function loadMemberCompletions() {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('phase1_completion')
-        .select('task_id, status')
-        .eq('user_id', selectedMemberId)
-      const map: Record<number, string> = {}
-      data?.forEach(row => {
-        if (!MEMBER_TASK_IDS.has(row.task_id)) map[row.task_id] = row.status
-      })
-      setCompletions(map)
-    }
-    loadMemberCompletions()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMemberId])
+  }, [userId, isAdmin, selectedMemberId])
 
   async function toggleMemberTask(taskId: number) {
     if (!userId) return
