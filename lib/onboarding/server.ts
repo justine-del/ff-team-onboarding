@@ -12,7 +12,9 @@ const LOCKED_GATES: PhaseGates = {
   guideComplete: false,
   phase1Unlocked: false,
   phase1Complete: false,
+  phase2Unlocked: false,
   phase2Complete: false,
+  sopsUnlocked: false,
   sopComplete: false,
 }
 

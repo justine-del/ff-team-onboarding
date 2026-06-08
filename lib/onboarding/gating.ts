@@ -20,14 +20,18 @@ export type PhaseCounts = {
 }
 
 export type PhaseGates = {
-  /** Guide acknowledged → Phase 1 is unlocked. */
+  /** Guide acknowledged. */
   guideComplete: boolean
-  /** Guide done → Phase 1 is reachable. */
+  /** Phase 1 reachable (guide done, or any Phase 1 progress already exists). */
   phase1Unlocked: boolean
-  /** Phase 1 finished → Phase 2 is unlocked. */
+  /** Phase 1 checklist fully done — gates Phase 2's "complete" status. */
   phase1Complete: boolean
-  /** Phase 1 AND Phase 2 finished → SOPs are unlocked. */
+  /** Phase 2 reachable (Phase 1 complete, or any Phase 2 progress already exists). */
+  phase2Unlocked: boolean
+  /** Phase 2 checklist fully done — gates SOPs' "complete" status. */
   phase2Complete: boolean
+  /** SOPs reachable (Phase 2 complete, or any SOP progress already exists). */
+  sopsUnlocked: boolean
   /** Everything finished. */
   sopComplete: boolean
 }
@@ -42,13 +46,25 @@ export function computePhaseGates(
   role?: string | null,
 ): PhaseGates {
   if (bypassesGating(role)) {
-    return { guideComplete: true, phase1Unlocked: true, phase1Complete: true, phase2Complete: true, sopComplete: true }
+    return {
+      guideComplete: true,
+      phase1Unlocked: true,
+      phase1Complete: true,
+      phase2Unlocked: true,
+      phase2Complete: true,
+      sopsUnlocked: true,
+      sopComplete: true,
+    }
   }
   const guideComplete = counts.guideDone
-  const phase1Unlocked = guideComplete
+  // "Unlocked" = the user can REACH the page. Either the prior phase is done,
+  // or they already have progress here (grandfathered from before gating).
+  const phase1Unlocked = guideComplete || counts.phase1Done > 0
   // "Complete" = the phase's checklist is fully done (gates the NEXT phase).
-  const phase1Complete = phase1Unlocked && counts.phase1Done >= PHASE_TOTALS.phase1
-  const phase2Complete = phase1Complete && counts.phase2Done >= PHASE_TOTALS.phase2
-  const sopComplete = phase2Complete && counts.sopsDone >= PHASE_TOTALS.sops
-  return { guideComplete, phase1Unlocked, phase1Complete, phase2Complete, sopComplete }
+  const phase1Complete = counts.phase1Done >= PHASE_TOTALS.phase1
+  const phase2Unlocked = phase1Complete || counts.phase2Done > 0
+  const phase2Complete = counts.phase2Done >= PHASE_TOTALS.phase2
+  const sopsUnlocked = phase2Complete || counts.sopsDone > 0
+  const sopComplete = counts.sopsDone >= PHASE_TOTALS.sops
+  return { guideComplete, phase1Unlocked, phase1Complete, phase2Unlocked, phase2Complete, sopsUnlocked, sopComplete }
 }

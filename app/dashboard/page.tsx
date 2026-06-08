@@ -116,8 +116,9 @@ export default async function DashboardPage() {
   const isNewUser = phase1Done === 0 && phase2Done === 0 && sopsD === 0
 
   // Sequential gating for everyone: Phase 0 (Guide) → Phase 1 → Phase 2 → SOPs.
-  // Each unlocks only when the prior step is done. Admins/super_admins bypass.
-  const { guideComplete, phase1Unlocked, phase1Complete, phase2Complete } = computePhaseGates(
+  // Each unlocks when the prior step is done OR the member already has progress
+  // in this phase (grandfathered). Admins/super_admins bypass.
+  const { guideComplete, phase1Unlocked, phase2Unlocked, sopsUnlocked } = computePhaseGates(
     { guideDone: profile?.guide_completed ?? false, phase1Done, phase2Done, sopsDone: sopsD },
     profile?.role,
   )
@@ -125,8 +126,8 @@ export default async function DashboardPage() {
   // Phases to show as 🔒 in the nav (admins have everything unlocked → empty).
   const lockedPaths = [
     !phase1Unlocked && '/onboarding/phase1',
-    !phase1Complete && '/onboarding/phase2',
-    !phase2Complete && '/onboarding/sops',
+    !phase2Unlocked && '/onboarding/phase2',
+    !sopsUnlocked && '/onboarding/sops',
   ].filter(Boolean) as string[]
 
   const cardClass = CARD_CLASS
@@ -162,7 +163,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {phase1Complete ? (
+      {phase2Unlocked ? (
         <Link href="/onboarding/phase2" className={cardClass}>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xl">🎓</span>
@@ -181,7 +182,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {phase2Complete ? (
+      {sopsUnlocked ? (
         <Link href="/onboarding/sops" className={cardClass}>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xl">📋</span>
