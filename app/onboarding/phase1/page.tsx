@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import QuickNav from '@/components/nav/QuickNav'
 import { computeTaskStates } from '@/lib/onboarding/taskGating'
+import { isPhase1Counted } from '@/lib/onboarding/gating'
 
 const SECURITY_NOTICES = [
   'Use LastPass or 1Password for all passwords',
@@ -175,7 +176,8 @@ function Phase1PageInner() {
     setCompletions(prev => ({ ...prev, [taskId]: newStatus }))
   }
 
-  const founderDone = FOUNDER_TASKS.filter(t => completions[t.id] === 'done').length
+  // N/A counts as actioned — same as done — for the Founder Setup tally.
+  const founderDone = FOUNDER_TASKS.filter(t => isPhase1Counted(completions[t.id])).length
   const memberDone = MEMBER_TASKS.filter(t => memberCompletions[t.id]).length
 
   // Sequential gating for the member checklist: each step unlocks the next.

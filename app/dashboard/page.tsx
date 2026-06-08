@@ -5,7 +5,7 @@ import Link from 'next/link'
 import MemberStats from '@/components/stats/MemberStatsLazy'
 import VAOffboardingForm from '@/components/offboarding/VAOffboardingForm'
 import { PHASE_TOTALS, WEEKS_OF_HISTORY, TIMEZONE_OFFSET_MS } from '@/lib/constants'
-import { computePhaseGates } from '@/lib/onboarding/gating'
+import { computePhaseGates, isPhase1Counted } from '@/lib/onboarding/gating'
 import { CARD_CLASS } from '@/lib/ui'
 import ProgressBar from '@/components/ui/ProgressBar'
 import QuickNav from '@/components/nav/QuickNav'
@@ -100,7 +100,7 @@ export default async function DashboardPage() {
     teamStats = { active, inconsistent, needsAttention, noActivity }
   }
 
-  const phase1Done = phase1.data?.filter(t => t.status === 'done').length ?? 0
+  const phase1Done = phase1.data?.filter(t => isPhase1Counted(t.status)).length ?? 0
   const phase1Total = PHASE_TOTALS.phase1
   const phase2Done = phase2.data?.length ?? 0
   const phase2Total = PHASE_TOTALS.phase2

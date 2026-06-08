@@ -6,7 +6,7 @@
  */
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
-import { computePhaseGates, type PhaseGates } from '@/lib/onboarding/gating'
+import { computePhaseGates, PHASE1_COUNTED_STATUSES, type PhaseGates } from '@/lib/onboarding/gating'
 
 const LOCKED_GATES: PhaseGates = {
   guideComplete: false,
@@ -38,7 +38,7 @@ export async function getPhaseContext(): Promise<PhaseContext> {
 
   const [profileRes, p1, p2, sops] = await Promise.all([
     admin.from('profiles').select('role, guide_completed').eq('id', user.id).single(),
-    admin.from('phase1_completion').select('status').eq('user_id', user.id).eq('status', 'done'),
+    admin.from('phase1_completion').select('status').eq('user_id', user.id).in('status', PHASE1_COUNTED_STATUSES),
     admin.from('lesson_completion').select('completed').eq('user_id', user.id).eq('completed', true),
     admin.from('sop_completion').select('completed').eq('user_id', user.id).eq('completed', true),
   ])

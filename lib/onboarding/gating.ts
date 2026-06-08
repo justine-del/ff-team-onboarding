@@ -8,6 +8,18 @@
  */
 import { PHASE_TOTALS } from '@/lib/constants'
 
+/**
+ * Phase 1 row statuses that count as "actioned" for progress + gating. A
+ * Founder task marked N/A (`not_needed`) is just as resolved as one marked
+ * done — both should let the member proceed. Member tasks only ever hold
+ * `'done'` or `'pending'`, so the same rule works for them too.
+ */
+export const PHASE1_COUNTED_STATUSES = ['done', 'not_needed'] as const
+
+export function isPhase1Counted(status: string | null | undefined): boolean {
+  return status === 'done' || status === 'not_needed'
+}
+
 export type PhaseCounts = {
   /** Phase 0 (Guide) acknowledged. */
   guideDone: boolean

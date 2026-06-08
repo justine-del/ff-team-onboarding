@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { PHASE1_COUNTED_STATUSES } from '@/lib/onboarding/gating'
 
 type Member = {
   id: string
@@ -89,7 +90,7 @@ export default function AdminPage() {
       const currentWeekOf = getCurrentWeekOf()
 
       const [p1, p2, sops, eowReports] = await Promise.all([
-        supabase.from('phase1_completion').select('user_id').eq('status', 'done').in('user_id', memberIds),
+        supabase.from('phase1_completion').select('user_id').in('status', PHASE1_COUNTED_STATUSES).in('user_id', memberIds),
         supabase.from('lesson_completion').select('user_id').eq('completed', true).in('user_id', memberIds),
         supabase.from('sop_completion').select('user_id').eq('completed', true).in('user_id', memberIds),
         supabase.from('eow_reports').select('user_id, week_of').eq('week_of', currentWeekOf).in('user_id', memberIds),
