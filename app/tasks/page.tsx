@@ -649,26 +649,50 @@ export default function TasksPage() {
 
   async function addCustomTask() {
     if (!userId || !newTask.task_name.trim()) return
-    const supabase = createClient()
-    const insertRow: Record<string, unknown> = {
-      user_id: userId,
-      task_name: newTask.task_name,
-      description: newTask.description,
-      days: newTask.days,
-      time_window: newTask.time_window,
-      est_time: newTask.est_time,
-      loom_link: '',
-      sop_doc_link: '',
-      created_week_start: weekStart,
+
+    let data: CustomTask | null = null
+    if (selectedMemberId) {
+      // Admin creating a task for another member — go through service-role API.
+      const res = await fetch('/api/admin/member-custom-tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          memberId: selectedMemberId,
+          task_name: newTask.task_name,
+          description: newTask.description,
+          days: newTask.days,
+          time_window: newTask.time_window,
+          est_time: newTask.est_time,
+          is_role: addContext.is_role ?? false,
+          parent_id: addContext.parent_id ?? null,
+          created_week_start: weekStart,
+        }),
+      })
+      if (res.ok) data = (await res.json()).task ?? null
+    } else {
+      const supabase = createClient()
+      const insertRow: Record<string, unknown> = {
+        user_id: userId,
+        task_name: newTask.task_name,
+        description: newTask.description,
+        days: newTask.days,
+        time_window: newTask.time_window,
+        est_time: newTask.est_time,
+        loom_link: '',
+        sop_doc_link: '',
+        created_week_start: weekStart,
+      }
+      // Only set the role columns when creating a role/sub-task, so plain-task
+      // creation keeps working even before the is_role/parent_id migration is run.
+      if (addContext.is_role) insertRow.is_role = true
+      if (addContext.parent_id) insertRow.parent_id = addContext.parent_id
+      const inserted = await supabase.from('va_custom_tasks').insert(insertRow).select().single()
+      data = inserted.data
     }
-    // Only set the role columns when creating a role/sub-task, so plain-task
-    // creation keeps working even before the is_role/parent_id migration is run.
-    if (addContext.is_role) insertRow.is_role = true
-    if (addContext.parent_id) insertRow.parent_id = addContext.parent_id
-    const { data } = await supabase.from('va_custom_tasks').insert(insertRow).select().single()
-    if (data) setCustomTasks(prev => [...prev, data])
+
+    if (data) setCustomTasks(prev => [...prev, data!])
     // Keep a newly-created role expanded so its sub-tasks are visible.
-    if (data?.is_role) setExpandedRoles(prev => new Set(prev).add(data.id))
+    if (data?.is_role) setExpandedRoles(prev => new Set(prev).add(data!.id))
     setNewTask({ task_name: '', description: '', days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '', est_time: '' })
     setShowAddForm(false)
     setAddContext({})
@@ -709,23 +733,49 @@ export default function TasksPage() {
 
   async function updateCustomTask(id: number, fields: Partial<Pick<CustomTask, 'task_name' | 'description' | 'days' | 'time_window' | 'est_time'>>) {
     if (!userId) return
-    const supabase = createClient()
-    const { error } = await supabase.from('va_custom_tasks').update(fields).eq('id', id)
-    if (error) {
-      alert(`Could not save: ${error.message}`)
-      return
+    if (selectedMemberId) {
+      const res = await fetch('/api/admin/member-custom-tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: selectedMemberId, id, fields }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        alert(`Could not save: ${j.error ?? res.statusText}`)
+        return
+      }
+    } else {
+      const supabase = createClient()
+      const { error } = await supabase.from('va_custom_tasks').update(fields).eq('id', id)
+      if (error) {
+        alert(`Could not save: ${error.message}`)
+        return
+      }
     }
     setCustomTasks(prev => prev.map(t => t.id === id ? { ...t, ...fields } : t))
   }
 
   async function deleteCustomTask(id: number) {
     if (!userId) return
-    const supabase = createClient()
-    // Mark deactivated from the viewed week onward. Past weeks keep showing
-    // this task and its logged time; current/future weeks hide it.
-    await supabase.from('va_custom_tasks')
-      .update({ active: false, deactivated_week_start: weekStart })
-      .eq('id', id)
+    if (selectedMemberId) {
+      const res = await fetch('/api/admin/member-custom-tasks', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: selectedMemberId, id, weekStart }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        alert(`Could not delete: ${j.error ?? res.statusText}`)
+        return
+      }
+    } else {
+      const supabase = createClient()
+      // Mark deactivated from the viewed week onward. Past weeks keep showing
+      // this task and its logged time; current/future weeks hide it.
+      await supabase.from('va_custom_tasks')
+        .update({ active: false, deactivated_week_start: weekStart })
+        .eq('id', id)
+    }
     setCustomTasks(prev => prev.filter(t => t.id !== id))
   }
 
@@ -1306,7 +1356,7 @@ export default function TasksPage() {
                     <option key={m.id} value={m.id}>{m.first_name} {m.last_name} ({m.email})</option>
                   ))}
                 </select>
-                {selectedMemberId && <span className="text-xs text-yellow-400 flex-shrink-0">Read-only view</span>}
+                {selectedMemberId && <span className="text-xs text-yellow-400 flex-shrink-0">Editing custom tasks · time logs read-only</span>}
               </div>
             )}
           </div>
@@ -1484,18 +1534,14 @@ export default function TasksPage() {
               <span className="text-xs text-teal-400/60">{customTasks.length} items</span>
             </div>
             <div className="flex items-center gap-2">
-              {!selectedMemberId && (
-                <>
-                  <button onClick={e => { e.stopPropagation(); openAdd({}) }}
-                    className="text-xs bg-teal-800/60 hover:bg-teal-700/60 text-teal-300 px-2.5 py-1 rounded-lg transition-colors">
-                    + Task
-                  </button>
-                  <button onClick={e => { e.stopPropagation(); openAdd({ is_role: true }) }}
-                    className="text-xs bg-teal-800/60 hover:bg-teal-700/60 text-teal-300 px-2.5 py-1 rounded-lg transition-colors">
-                    + Role
-                  </button>
-                </>
-              )}
+              <button onClick={e => { e.stopPropagation(); openAdd({}) }}
+                className="text-xs bg-teal-800/60 hover:bg-teal-700/60 text-teal-300 px-2.5 py-1 rounded-lg transition-colors">
+                + Task
+              </button>
+              <button onClick={e => { e.stopPropagation(); openAdd({ is_role: true }) }}
+                className="text-xs bg-teal-800/60 hover:bg-teal-700/60 text-teal-300 px-2.5 py-1 rounded-lg transition-colors">
+                + Role
+              </button>
               <span className="text-teal-400 text-xs">{collapsed.custom ? '▼ Show' : '▲ Hide'}</span>
             </div>
           </button>
@@ -1637,7 +1683,7 @@ export default function TasksPage() {
                         {task.description && <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>}
                         <LinkSection taskId={task.id + 10000} />
                         <NoteSection taskKey={`custom-${task.id}`} taskId={task.id + 10000} expandedNote={expandedNote} setExpandedNote={setExpandedNote} taskNotes={taskNotes} setTaskNotes={setTaskNotes} saveTaskNote={saveTaskNote} disabled={!!selectedMemberId} />
-                        {isRole && expandedRoles.has(task.id) && !selectedMemberId && (
+                        {isRole && expandedRoles.has(task.id) && (
                           <button onClick={() => openAdd({ parent_id: task.id })} className="text-xs text-teal-400 hover:text-teal-300 mt-1.5 transition-colors">+ sub-task</button>
                         )}
                       </td>
@@ -1669,25 +1715,23 @@ export default function TasksPage() {
                         )
                       })}
                       <td className="py-3 align-top">
-                        {!selectedMemberId && (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => {
-                                setEditDraft({
-                                  task_name: task.task_name,
-                                  description: task.description ?? '',
-                                  days: [...(task.days ?? [])],
-                                  time_window: task.time_window ?? '',
-                                  est_time: task.est_time ?? '',
-                                })
-                                setEditingTaskId(task.id)
-                              }}
-                              title="Edit task"
-                              className="text-gray-600 hover:text-blue-400 text-xs transition-colors"
-                            >✎</button>
-                            <button onClick={() => deleteCustomTask(task.id)} title="Delete task" className="text-gray-600 hover:text-red-400 text-xs transition-colors">✕</button>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setEditDraft({
+                                task_name: task.task_name,
+                                description: task.description ?? '',
+                                days: [...(task.days ?? [])],
+                                time_window: task.time_window ?? '',
+                                est_time: task.est_time ?? '',
+                              })
+                              setEditingTaskId(task.id)
+                            }}
+                            title="Edit task"
+                            className="text-gray-600 hover:text-blue-400 text-xs transition-colors"
+                          >✎</button>
+                          <button onClick={() => deleteCustomTask(task.id)} title="Delete task" className="text-gray-600 hover:text-red-400 text-xs transition-colors">✕</button>
+                        </div>
                       </td>
                     </tr>
                     )

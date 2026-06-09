@@ -2,30 +2,102 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function GET(req: NextRequest) {
+/**
+ * Admin-only CRUD for another member's `va_custom_tasks` rows. Reads (GET)
+ * use service role to bypass RLS; writes (POST/PATCH/DELETE) verify the
+ * caller is admin/super_admin and force the target row's `user_id` to the
+ * supplied memberId, so an admin can't accidentally mutate the wrong user.
+ */
+
+async function requireAdmin() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+  if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (!['admin', 'super_admin'].includes(profile?.role ?? '')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
   }
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  )
+  return { admin }
+}
+
+export async function GET(req: NextRequest) {
+  const ctx = await requireAdmin()
+  if (ctx.error) return ctx.error
 
   const { searchParams } = new URL(req.url)
   const memberId = searchParams.get('memberId')
   if (!memberId) return NextResponse.json({ error: 'Missing memberId' }, { status: 400 })
 
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-
-  const { data } = await admin
-    .from('va_custom_tasks')
-    .select('*')
-    .eq('user_id', memberId)
-
+  const { data } = await ctx.admin.from('va_custom_tasks').select('*').eq('user_id', memberId)
   return NextResponse.json({ customTasks: data ?? [] })
+}
+
+export async function POST(req: NextRequest) {
+  const ctx = await requireAdmin()
+  if (ctx.error) return ctx.error
+
+  const body = await req.json()
+  const { memberId, task_name, description, days, time_window, est_time, is_role, parent_id, created_week_start } = body
+  if (!memberId || !task_name?.trim()) {
+    return NextResponse.json({ error: 'Missing memberId or task_name' }, { status: 400 })
+  }
+
+  const insertRow: Record<string, unknown> = {
+    user_id: memberId,
+    task_name,
+    description: description ?? '',
+    days: days ?? [],
+    time_window: time_window ?? '',
+    est_time: est_time ?? '',
+    loom_link: '',
+    sop_doc_link: '',
+    created_week_start,
+  }
+  if (is_role) insertRow.is_role = true
+  if (parent_id) insertRow.parent_id = parent_id
+
+  const { data, error } = await ctx.admin.from('va_custom_tasks').insert(insertRow).select().single()
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ task: data })
+}
+
+export async function PATCH(req: NextRequest) {
+  const ctx = await requireAdmin()
+  if (ctx.error) return ctx.error
+
+  const body = await req.json()
+  const { memberId, id, fields } = body
+  if (!memberId || !id || !fields) {
+    return NextResponse.json({ error: 'Missing memberId, id, or fields' }, { status: 400 })
+  }
+
+  // Defense in depth: only update if the row actually belongs to this member.
+  const { data, error } = await ctx.admin.from('va_custom_tasks').update(fields).eq('id', id).eq('user_id', memberId).select().single()
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ task: data })
+}
+
+export async function DELETE(req: NextRequest) {
+  const ctx = await requireAdmin()
+  if (ctx.error) return ctx.error
+
+  const body = await req.json()
+  const { memberId, id, weekStart } = body
+  if (!memberId || !id || !weekStart) {
+    return NextResponse.json({ error: 'Missing memberId, id, or weekStart' }, { status: 400 })
+  }
+
+  // Match the member-side soft-delete: keep past weeks' history, hide from
+  // the viewed week onward.
+  const { error } = await ctx.admin.from('va_custom_tasks')
+    .update({ active: false, deactivated_week_start: weekStart })
+    .eq('id', id)
+    .eq('user_id', memberId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
 }
