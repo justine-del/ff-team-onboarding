@@ -78,11 +78,17 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
     { auth: { autoRefreshToken: false, persistSession: false } },
   )
 
-  // Members for the filter dropdown.
-  const membersRes = await admin.from('profiles').select('id, first_name, last_name').eq('role', 'member').order('first_name')
+  // Everyone who works the task portal — VAs, offboarding VAs, and admins
+  // (Justine and Peter both log time too, even though their primary role is
+  // admin). Audit log spans the whole team.
+  const membersRes = await admin.from('profiles').select('id, first_name, last_name, role').in('role', ['member', 'offboarding', 'admin', 'super_admin']).order('first_name')
   const members = membersRes.data ?? []
   const memberName = new Map<string, string>()
-  for (const m of members) memberName.set(m.id as string, `${m.first_name ?? ''} ${m.last_name ?? ''}`.trim() || 'Member')
+  for (const m of members) {
+    const base = `${m.first_name ?? ''} ${m.last_name ?? ''}`.trim() || 'User'
+    const tag = m.role === 'admin' || m.role === 'super_admin' ? ' (admin)' : m.role === 'offboarding' ? ' (offboarding)' : ''
+    memberName.set(m.id as string, `${base}${tag}`)
+  }
 
   // Build the filtered query.
   let query = admin.from('task_audit_log').select('*').order('created_at', { ascending: false }).limit(500)

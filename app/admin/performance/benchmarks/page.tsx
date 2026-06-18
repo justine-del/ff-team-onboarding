@@ -60,9 +60,11 @@ export default async function BenchmarksPage() {
 
   const weekStarts = getRecentWeekStarts(4)
 
-  // Pull members, custom tasks (with est_minutes), and recent completions in parallel.
+  // Pull everyone who could be logging time (members, offboarding members, and
+  // admins/super_admins who also work the task portal — per the operating
+  // model, admins like Justine and Peter use the same task sheet).
   const [membersRes, customTasksRes, taskDefsRes, completionsRes] = await Promise.all([
-    admin.from('profiles').select('id, first_name, last_name').eq('role', 'member'),
+    admin.from('profiles').select('id, first_name, last_name, role').in('role', ['member', 'offboarding', 'admin', 'super_admin']),
     admin.from('va_custom_tasks').select('id, user_id, task_name, est_minutes, is_role, parent_id, active').eq('active', true),
     admin.from('task_definitions').select('id, task_name, est_minutes'),
     admin.from('task_completions').select('user_id, task_id, time_spent, week_start, day').in('week_start', weekStarts).gt('time_spent', 0),
@@ -73,9 +75,16 @@ export default async function BenchmarksPage() {
   const taskDefs = taskDefsRes.data ?? []
   const completions = completionsRes.data ?? []
 
-  // Build lookup tables.
+  // Build lookup tables. Admins/super_admins get an "(admin)" tag so the
+  // table is unambiguous when scanning — Justine and Peter both appear here
+  // because they also log time against the task portal.
   const memberName = new Map<string, string>()
-  for (const m of members) memberName.set(m.id as string, `${m.first_name ?? ''} ${m.last_name ?? ''}`.trim() || 'Member')
+  for (const m of members) {
+    const base = `${m.first_name ?? ''} ${m.last_name ?? ''}`.trim() || 'User'
+    const role = (m as { role?: string }).role
+    const tag = role === 'admin' || role === 'super_admin' ? ' (admin)' : role === 'offboarding' ? ' (offboarding)' : ''
+    memberName.set(m.id as string, `${base}${tag}`)
+  }
 
   // Task metadata keyed by the task_id as it appears in task_completions:
   //  - reference tasks: task_id = task_definitions.id
