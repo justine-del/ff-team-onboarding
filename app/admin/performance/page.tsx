@@ -232,6 +232,12 @@ export default async function PerformancePage() {
           </div>
         </div>
 
+        <div className="mb-4">
+          <Link href="/admin/performance/benchmarks" className="text-sm text-blue-400 hover:text-blue-300 transition-colors">
+            View time benchmarks (est. vs. actual) →
+          </Link>
+        </div>
+
         {sorted.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <p className="text-lg mb-2">No team members yet.</p>

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import QuickNav from '@/components/nav/QuickNav'
 import { brand } from '@/config/brand'
+import { fireAuditLog } from '@/lib/audit/clientLog'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -137,6 +138,7 @@ type CustomTask = {
   days: string[]
   time_window: string
   est_time: string
+  est_minutes?: number | null
   loom_link: string
   sop_doc_link: string
   is_role?: boolean
@@ -173,16 +175,22 @@ function TimerCell({ mins, disabled, onSave, completionKey }: {
   const [inputVal, setInputVal] = useState(mins > 0 ? String(mins) : '')
   const [timerStart, setTimerStart] = useState<number | null>(null)
   const [elapsed, setElapsed] = useState(0)
+  // Mode: 'manual' = user types minutes; 'timer' = stopwatch. Default 'manual'
+  // (most VAs log a known duration). The toggle is just affordance; the timer
+  // button still works in either mode if visible.
+  const [mode, setMode] = useState<'manual' | 'timer'>('manual')
 
   useEffect(() => { setInputVal(mins > 0 ? String(mins) : '') }, [mins])
 
-  // Restore timer from localStorage on mount (survives page reload)
+  // Restore timer from localStorage on mount (survives page reload). If a
+  // timer is already running for this cell, force the mode to 'timer'.
   useEffect(() => {
     const saved = localStorage.getItem(storageKey)
     if (saved) {
       const start = parseInt(saved)
       setTimerStart(start)
       setElapsed(Math.floor((Date.now() - start) / 1000))
+      setMode('timer')
     }
   }, [storageKey])
 
@@ -201,6 +209,7 @@ function TimerCell({ mins, disabled, onSave, completionKey }: {
     localStorage.setItem(storageKey, String(now))
     setTimerStart(now)
     setElapsed(0)
+    setMode('timer')
   }
 
   function stopTimer() {
@@ -218,6 +227,23 @@ function TimerCell({ mins, disabled, onSave, completionKey }: {
 
   return (
     <div className="flex flex-col items-center gap-0.5">
+      {!disabled && (
+        <div className="flex items-center gap-0 text-[9px] leading-none mb-0.5 rounded border border-gray-800 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setMode('manual')}
+            disabled={!!timerStart}
+            className={`px-1.5 py-0.5 transition-colors ${mode === 'manual' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'} ${timerStart ? 'opacity-40 cursor-not-allowed' : ''}`}
+            title="Manual entry: type minutes directly"
+          >Manual</button>
+          <button
+            type="button"
+            onClick={() => setMode('timer')}
+            className={`px-1.5 py-0.5 transition-colors ${mode === 'timer' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+            title="Timer: start a stopwatch"
+          >Timer</button>
+        </div>
+      )}
       <input
         type="number"
         min="0"
@@ -226,11 +252,11 @@ function TimerCell({ mins, disabled, onSave, completionKey }: {
         onChange={e => setInputVal(e.target.value)}
         onBlur={() => commit(inputVal)}
         onKeyDown={e => { if (e.key === 'Enter') { commit(inputVal); (e.target as HTMLInputElement).blur() } }}
-        disabled={disabled}
-        className={`w-14 text-center text-sm rounded-md px-1 py-1 border focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${timeBadgeClass(mins)} ${disabled ? 'opacity-70 cursor-default' : ''}`}
+        disabled={disabled || !!timerStart}
+        className={`w-14 text-center text-sm rounded-md px-1 py-1 border focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${timeBadgeClass(mins)} ${disabled || timerStart ? 'opacity-70 cursor-default' : ''}`}
       />
       {mins > 0 && <span className="text-[9px] text-gray-500 leading-none">{formatTime(mins)}</span>}
-      {!disabled && (
+      {!disabled && mode === 'timer' && (
         timerStart ? (
           <button onClick={stopTimer} title="Stop timer" className="text-[10px] text-red-400 hover:text-red-300 font-mono leading-none transition-colors">
             ■ {elapsedDisplay}
@@ -317,7 +343,7 @@ export default function TasksPage() {
   // What the add form is creating: a plain task, a role, or a sub-task under a role.
   const [addContext, setAddContext] = useState<{ is_role?: boolean; parent_id?: number | null }>({})
   const [expandedRoles, setExpandedRoles] = useState<Set<number>>(new Set())
-  const [newTask, setNewTask] = useState({ task_name: '', description: '', days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '', est_time: '' })
+  const [newTask, setNewTask] = useState({ task_name: '', description: '', days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '', est_time: '', est_minutes: '' })
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null)
   const [editDraft, setEditDraft] = useState({ task_name: '', description: '', days: [] as string[], time_window: '', est_time: '' })
   const [savingLink, setSavingLink] = useState<number | null>(null)
@@ -571,6 +597,17 @@ export default function TasksPage() {
       setCompletions(c => ({ ...c, [key]: prev }))
       setSaveError(`Failed to save (${day}): ${error.message}`)
       setTimeout(() => setSaveError(null), 5000)
+    } else if (prev !== minutes) {
+      // HR audit trail (Section XI). Only log meaningful changes; ignore no-ops.
+      fireAuditLog({
+        targetUserId: userId,
+        entityType: 'task_completions',
+        entityId: `${taskId}:${weekStart}:${day}`,
+        action: prev === 0 ? 'create' : (minutes === 0 ? 'delete' : 'update'),
+        before: { time_spent: prev },
+        after: { time_spent: minutes },
+        context: { task_id: taskId, week_start: weekStart, day },
+      })
     }
     setSavingCell(null)
   }
@@ -650,6 +687,11 @@ export default function TasksPage() {
   async function addCustomTask() {
     if (!userId || !newTask.task_name.trim()) return
 
+    // Parse the optional numeric est_minutes; keep undefined if blank or invalid
+    // so the DB column stays NULL rather than 0 (0 would skew benchmarks).
+    const parsedEstMin = newTask.est_minutes.trim() === '' ? undefined : Number(newTask.est_minutes)
+    const estMinutes = Number.isFinite(parsedEstMin) && (parsedEstMin as number) > 0 ? (parsedEstMin as number) : undefined
+
     let data: CustomTask | null = null
     if (selectedMemberId) {
       // Admin creating a task for another member — go through service-role API.
@@ -663,6 +705,7 @@ export default function TasksPage() {
           days: newTask.days,
           time_window: newTask.time_window,
           est_time: newTask.est_time,
+          est_minutes: estMinutes,
           is_role: addContext.is_role ?? false,
           parent_id: addContext.parent_id ?? null,
           created_week_start: weekStart,
@@ -686,6 +729,7 @@ export default function TasksPage() {
       // creation keeps working even before the is_role/parent_id migration is run.
       if (addContext.is_role) insertRow.is_role = true
       if (addContext.parent_id) insertRow.parent_id = addContext.parent_id
+      if (estMinutes !== undefined) insertRow.est_minutes = estMinutes
       const inserted = await supabase.from('va_custom_tasks').insert(insertRow).select().single()
       data = inserted.data
     }
@@ -693,7 +737,7 @@ export default function TasksPage() {
     if (data) setCustomTasks(prev => [...prev, data!])
     // Keep a newly-created role expanded so its sub-tasks are visible.
     if (data?.is_role) setExpandedRoles(prev => new Set(prev).add(data!.id))
-    setNewTask({ task_name: '', description: '', days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '', est_time: '' })
+    setNewTask({ task_name: '', description: '', days: ['Mon','Tue','Wed','Thu','Fri'], time_window: '', est_time: '', est_minutes: '' })
     setShowAddForm(false)
     setAddContext({})
   }
@@ -1530,7 +1574,7 @@ export default function TasksPage() {
           <button onClick={() => toggleSection('custom')} className="w-full flex items-center justify-between px-4 py-2.5 bg-teal-950/40 border border-teal-800/50 rounded-xl mb-3 hover:bg-teal-950/60 transition-colors">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-teal-400 flex-shrink-0"></span>
-              <span className="font-semibold text-teal-300 text-sm">My Custom Tasks &amp; Roles</span>
+              <span className="font-semibold text-teal-300 text-sm">My Custom Tasks &amp; Projects</span>
               <span className="text-xs text-teal-400/60">{customTasks.length} items</span>
             </div>
             <div className="flex items-center gap-2">
@@ -1538,9 +1582,9 @@ export default function TasksPage() {
                 className="text-xs bg-teal-800/60 hover:bg-teal-700/60 text-teal-300 px-2.5 py-1 rounded-lg transition-colors">
                 + Task
               </button>
-              <button onClick={e => { e.stopPropagation(); openAdd({ is_role: true }) }}
+              <button title="A project groups related tasks (e.g. Finance with sub-tasks Reconciliation, Payroll)" onClick={e => { e.stopPropagation(); openAdd({ is_role: true }) }}
                 className="text-xs bg-teal-800/60 hover:bg-teal-700/60 text-teal-300 px-2.5 py-1 rounded-lg transition-colors">
-                + Role
+                + Project
               </button>
               <span className="text-teal-400 text-xs">{collapsed.custom ? '▼ Show' : '▲ Hide'}</span>
             </div>
@@ -1551,28 +1595,38 @@ export default function TasksPage() {
 
           {showAddForm && (
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-4">
-              <h4 className="text-sm font-medium mb-3">{addContext.is_role ? 'New Role' : addContext.parent_id ? 'New Sub-task' : 'New Custom Task'}</h4>
+              <h4 className="text-sm font-medium mb-3">{addContext.is_role ? 'New Project' : addContext.parent_id ? 'New Sub-task' : 'New Custom Task'}</h4>
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Task Name *</label>
+                  <label className="block text-xs text-gray-400 mb-1">{addContext.is_role ? 'Project Name *' : 'Task Name *'}</label>
                   <input required value={newTask.task_name} onChange={e => setNewTask(p => ({ ...p, task_name: e.target.value }))}
+                    placeholder={addContext.is_role ? 'e.g. Finance' : 'e.g. Bank reconciliation'}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">Description</label>
-                  <input value={newTask.description} onChange={e => setNewTask(p => ({ ...p, description: e.target.value }))}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <textarea value={newTask.description} onChange={e => setNewTask(p => ({ ...p, description: e.target.value }))}
+                    rows={3}
+                    placeholder="What does this task involve? Add SOP context, prerequisites, gotchas a future-you would forget..."
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y" />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">Time Window</label>
                     <input value={newTask.time_window} onChange={e => setNewTask(p => ({ ...p, time_window: e.target.value }))} placeholder="e.g. 8 PM EST"
                       className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Est. Time</label>
+                    <label className="block text-xs text-gray-400 mb-1">Est. Time (label)</label>
                     <input value={newTask.est_time} onChange={e => setNewTask(p => ({ ...p, est_time: e.target.value }))} placeholder="e.g. 15 mins"
                       className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1" title="Numeric benchmark in minutes. Used to flag tasks that consistently run over estimate.">Est. Minutes</label>
+                    <input type="number" min="0" step="5" value={newTask.est_minutes}
+                      onChange={e => setNewTask(p => ({ ...p, est_minutes: e.target.value }))}
+                      placeholder="e.g. 15"
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                   </div>
                 </div>
                 <div>
@@ -1587,7 +1641,7 @@ export default function TasksPage() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={addCustomTask} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">{addContext.is_role ? 'Add Role' : addContext.parent_id ? 'Add Sub-task' : 'Add Task'}</button>
+                  <button onClick={addCustomTask} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">{addContext.is_role ? 'Add Project' : addContext.parent_id ? 'Add Sub-task' : 'Add Task'}</button>
                   <button onClick={() => { setShowAddForm(false); setAddContext({}) }} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition-colors">Cancel</button>
                 </div>
               </div>
@@ -1678,7 +1732,7 @@ export default function TasksPage() {
                             </button>
                           )}
                           <p className="font-medium">{indent ? <span className="text-gray-600">└ </span> : ''}{task.task_name}</p>
-                          {isRole && <span className="text-[10px] uppercase tracking-wide text-teal-400/70 border border-teal-800/60 rounded px-1.5 py-0.5">Role</span>}
+                          {isRole && <span className="text-[10px] uppercase tracking-wide text-teal-400/70 border border-teal-800/60 rounded px-1.5 py-0.5">Project</span>}
                         </div>
                         {task.description && <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>}
                         <LinkSection taskId={task.id + 10000} />
