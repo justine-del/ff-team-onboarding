@@ -103,7 +103,7 @@ Write a professional EOW report using EXACTLY this format and structure:
 Keep the tone professional and honest. Use only the data provided. Do not invent tasks or numbers.`
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: 'llama-3.3-70b-specdec',
       max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
     })
