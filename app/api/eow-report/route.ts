@@ -105,6 +105,8 @@ Keep the tone professional and honest. Use only the data provided. Do not invent
     const completion = await groq.chat.completions.create({
       model: 'qwen/qwen3.6-27b',
       max_tokens: 2000,
+      // @ts-ignore — groq SDK types lag behind API; reasoning_effort is valid
+      reasoning_effort: 'none',
       messages: [{ role: 'user', content: prompt }],
     })
 
