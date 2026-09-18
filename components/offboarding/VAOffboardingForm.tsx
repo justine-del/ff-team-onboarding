@@ -13,6 +13,8 @@ type Existing = {
   va_submitted: boolean | null
 } | null
 
+type Stats = { totalHours: number; weeksActive: number; phase1Done: number }
+
 const REASONS: Record<string, string> = {
   contract_end: 'Contract End',
   performance: 'Performance',
@@ -20,7 +22,7 @@ const REASONS: Record<string, string> = {
   other: 'Other',
 }
 
-export default function VAOffboardingForm({ firstName, existing }: { firstName: string; existing: Existing }) {
+export default function VAOffboardingForm({ firstName, existing, stats }: { firstName: string; existing: Existing; stats: Stats | null }) {
   const [form, setForm] = useState({
     last_project: existing?.last_project ?? '',
     sops_used: existing?.sops_used ?? '',
@@ -81,6 +83,28 @@ export default function VAOffboardingForm({ firstName, existing }: { firstName: 
               <p className="font-semibold text-green-400 text-sm">Submitted to Admin</p>
               <p className="text-xs text-gray-400 mt-0.5">Your admin is reviewing. You can still edit and re-save below if needed.</p>
             </div>
+          </div>
+        )}
+
+        {/* Portal stats — read-only, helps VA fill invoice */}
+        {stats && (
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Your Portal Activity</p>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="bg-gray-800 rounded-lg py-3 px-2">
+                <div className="text-xl font-bold text-white">{stats.totalHours}</div>
+                <div className="text-xs text-gray-400 mt-0.5">Hours logged</div>
+              </div>
+              <div className="bg-gray-800 rounded-lg py-3 px-2">
+                <div className="text-xl font-bold text-white">{stats.weeksActive}</div>
+                <div className="text-xs text-gray-400 mt-0.5">Weeks active</div>
+              </div>
+              <div className="bg-gray-800 rounded-lg py-3 px-2">
+                <div className="text-xl font-bold text-white">{stats.phase1Done}</div>
+                <div className="text-xs text-gray-400 mt-0.5">Phase 1 tasks</div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-3">Use this as a reference when calculating your final invoice. Cross-check against your Geekbot standups for deliverables.</p>
           </div>
         )}
 
