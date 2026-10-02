@@ -51,12 +51,25 @@ export default async function DashboardPage() {
 
   // VA is in the offboarding process — show their fillable form
   if (profile?.role === 'offboarding') {
-    const { data: offboardingData } = await admin
-      .from('va_offboarding')
-      .select('last_project, sops_used, reason, invoice_period, invoice_amount, invoice_notes, va_submitted')
-      .eq('user_id', user.id)
-      .maybeSingle()
-    return <VAOffboardingForm firstName={profile?.first_name ?? 'there'} existing={offboardingData} />
+    const [offboardingRes, tcRes, p1Res] = await Promise.all([
+      admin.from('va_offboarding')
+        .select('last_project, sops_used, reason, invoice_period, invoice_amount, invoice_notes, va_submitted')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+      admin.from('task_completions').select('week_start, time_spent').eq('user_id', user.id),
+      admin.from('phase1_completion').select('status').eq('user_id', user.id),
+    ])
+
+    const tcRows = tcRes.data ?? []
+    const weeksActive = new Set(tcRows.filter(r => (r.time_spent ?? 0) > 0).map(r => r.week_start)).size
+    const totalHours = Math.round(tcRows.reduce((s, r) => s + (r.time_spent ?? 0), 0) / 60 * 10) / 10
+    const phase1Done = (p1Res.data ?? []).filter(t => isPhase1Counted(t.status)).length
+
+    return <VAOffboardingForm
+      firstName={profile?.first_name ?? 'there'}
+      existing={offboardingRes.data}
+      stats={{ totalHours, weeksActive, phase1Done }}
+    />
   }
 
   const isAdminUser = profile?.role === 'super_admin'
